@@ -1,7 +1,8 @@
 import hikari
 import lightbulb
+import os
 
-bot = lightbulb.BotApp(token="MTI4NTI5ODM1MjMwODYyMTQxNg.GaCLW5.mSnd-j0-mJTU7_CJO83N7Ie-pT_iXXtDLM3-5k")
+bot = lightbulb.BotApp(token=os.getenv("BOT_TOKEN"))
 
 # Presence
 @bot.listen(hikari.StartedEvent)
