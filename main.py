@@ -57,10 +57,7 @@ DERE_TYPES = {
     "himedere": "You are a waifu who acts like royalty, expecting to be treated like a princess but has a soft side."
 }
 
-bot = lightbulb.BotApp(
-	intents = hikari.Intents.ALL_UNPRIVILEGED | hikari.Intents.GUILD_MESSAGES | hikari.Intents.MESSAGE_CONTENT,
-	token=os.getenv("BOT_TOKEN")
-)
+bot = lightbulb.BotApp(token=os.getenv("BOT_TOKEN"))
 openai_client = AsyncOpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 # # Top.gg
@@ -681,7 +678,7 @@ async def help(ctx):
     embed = hikari.Embed(
         title="📚 Help 📚",
         description=(
-            "Hello! I'm Aiko, your very own waifu chatbot! To talk to me, reply or ping me in channels or dms. Use the /setchannel_toggle command to set channels for me to respond in.\n\n"
+            "Hello! I'm Aiko, your very own waifu chatbot! To talk to me, reply or ping me in channels. Use the /setchannel_toggle command to set channels for me to respond in.\n\n"
             "For suggestions and help, feel free to join the [support server](https://discord.com/invite/x7MdgVFUwa). My developer will be happy to help! [Click here](https://discord.com/oauth2/authorize?client_id=1285298352308621416), to invite me to your server.\n\n"
             # "Use the `/claim` command to receive your perks after becoming a supporter.\n\n"
             "**Commands:**\n"
