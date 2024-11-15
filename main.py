@@ -294,7 +294,7 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
                     )
                     embed.set_image("https://i.imgur.com/rcgSVxC.gif")
                     await event.message.respond(embed=embed)
-                    await bot.rest.create_message(1285303149682364548, f"Voting message sent in `{event.get_guild().name}` to `{event.author.id}`.")
+                    await bot.rest.create_message(1285303262127325301, f"Voting message sent in `{event.get_guild().name}` to `{event.author.id}`.")
 
                     user_limit_reached[user_id] = current_time
                     return
@@ -341,7 +341,7 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
                     )
                     embed.set_image("https://i.imgur.com/rcgSVxC.gif")
                     await event.message.respond(embed=embed)
-                    await bot.rest.create_message(1285303149682364548, f"Voting message sent in `{event.get_guild().name}` to `{event.author.id}`.")
+                    await bot.rest.create_message(1285303262127325301, f"Voting message sent in `{event.get_guild().name}` to `{event.author.id}`.")
 
                     user_limit_reached[user_id] = current_time
                     return
@@ -382,7 +382,7 @@ async def setchannel(ctx):
     if not is_admin and not is_premium_user:
         await ctx.respond("Sorry, this command is restricted to admins and supporters.")
         try:
-            await bot.rest.create_message(1285303149682364548, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+            await bot.rest.create_message(1285303262127325301, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
         except Exception as e:
             print(f"{e}")
         return
@@ -419,7 +419,7 @@ async def setchannel(ctx):
         update_data({'prem_users': prem_users})
 
     try:
-        await bot.rest.create_message(1285303149682364548, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
         print(f"{e}")
 
@@ -451,7 +451,7 @@ async def viewsetchannels(ctx):
     await ctx.respond(embed=embed)
 
     try:
-        await bot.rest.create_message(1285303149682364548, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
         print(f"{e}")
 
@@ -493,7 +493,7 @@ async def viewsetchannels(ctx):
 #         await ctx.respond(embed=embed)
 
 #         try:
-#             await bot.rest.create_message(1285303149682364548, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+#             await bot.rest.create_message(1285303262127325301, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
 #         except Exception as e:
 #             print(f"{e}")
 #         return
@@ -531,7 +531,7 @@ async def viewsetchannels(ctx):
 #     })
 
 #     try:
-#         await bot.rest.create_message(1285303149682364548, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+#         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
 #     except Exception as e:
 #         print(f"{e}")
 
@@ -568,7 +568,7 @@ async def viewsetchannels(ctx):
 #         embed.set_image("https://i.imgur.com/rcgSVxC.gif")
 #         await ctx.respond(embed=embed)
 #         try:
-#             await bot.rest.create_message(1285303149682364548, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+#             await bot.rest.create_message(1285303262127325301, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
 #         except Exception as e:
 #             print(f"{e}")
 #         return
@@ -594,7 +594,7 @@ async def viewsetchannels(ctx):
 #     await ctx.respond(response_message)
 
 #     try:
-#         await bot.rest.create_message(1285303149682364548, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+#         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
 #     except Exception as e:
 #         print(f"{e}")
 
@@ -602,9 +602,9 @@ async def viewsetchannels(ctx):
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
 @lightbulb.option('personality', 'Choose a dere type for Aiko.', choices=list(DERE_TYPES.keys()), type=str)
-@lightbulb.command('set_personality', 'Set Aiko\'s dere type personality.')
+@lightbulb.command('dere_set', 'Set Aiko\'s dere type personality.')
 @lightbulb.implements(lightbulb.SlashCommand)
-async def set_personality(ctx: lightbulb.Context) -> None:
+async def dere_set(ctx: lightbulb.Context) -> None:
     user_id = str(ctx.author.id)
     selected_personality = ctx.options.personality
 
@@ -618,16 +618,16 @@ async def set_personality(ctx: lightbulb.Context) -> None:
     await ctx.respond(f'Aiko\'s personality has been set to "{selected_personality.capitalize()}".')
 
     try:
-        await bot.rest.create_message(1285303149682364548, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
         print(f"{e}")
 
 # View style command    
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.command('view_personality', 'View Aiko\'s current dere type personality.')
+@lightbulb.command('dere_view', 'View Aiko\'s current dere type personality.')
 @lightbulb.implements(lightbulb.SlashCommand)
-async def view_personality(ctx: lightbulb.Context) -> None:
+async def dere_view(ctx: lightbulb.Context) -> None:
     user_id = str(ctx.author.id)
     data = load_data()
 
@@ -639,16 +639,16 @@ async def view_personality(ctx: lightbulb.Context) -> None:
         await ctx.respond("Aiko is currently using her default personality.")
 
     try:
-        await bot.rest.create_message(1285303149682364548, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
         print(f"{e}")
 
 # Clear style command
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.command('clear_personality', 'Clear Aiko\'s dere type personality.')
+@lightbulb.command('dere_clear', 'Clear Aiko\'s dere type personality.')
 @lightbulb.implements(lightbulb.SlashCommand)
-async def clear_personality(ctx: lightbulb.Context) -> None:
+async def dere_clear(ctx: lightbulb.Context) -> None:
     user_id = str(ctx.author.id)
     data = load_data()
 
@@ -660,7 +660,7 @@ async def clear_personality(ctx: lightbulb.Context) -> None:
         await ctx.respond("Aiko is already using her default personality.")
 
     try:
-        await bot.rest.create_message(1285303149682364548, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
         print(f"{e}")
 
@@ -696,7 +696,7 @@ async def help(ctx):
     await ctx.respond(embed=embed)
 
     try:
-        await bot.rest.create_message(1285303149682364548, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
         print(f"{e}")
 
