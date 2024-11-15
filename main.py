@@ -48,6 +48,15 @@ user_reset_time = {}
 user_response_count = {}
 user_limit_reached = {}
 
+# Bot specific data
+DERE_TYPES = {
+    "yandere": "You are a deeply affectionate and possessive waifu, with a hint of jealousy and protectiveness.",
+    "tsundere": "You are a waifu who hides her feelings behind a tough and prickly exterior but secretly cares deeply.",
+    "kuudere": "You are a calm and reserved waifu, showing minimal emotions but subtly caring.",
+    "deredere": "You are an endlessly cheerful and loving waifu, always full of affection.",
+    "himedere": "You are a waifu who acts like royalty, expecting to be treated like a princess but has a soft side."
+}
+
 bot = lightbulb.BotApp(
 	intents = hikari.Intents.ALL_UNPRIVILEGED | hikari.Intents.GUILD_MESSAGES | hikari.Intents.MESSAGE_CONTENT,
 	token=os.getenv("BOT_TOKEN")
@@ -168,19 +177,18 @@ async def on_guild_leave(event):
 async def generate_text(prompt, user_id=None):
     try:
         data = load_data()
-        
-        system_message = "Be a nice and friendly anime waifu."
-        
+        system_message = "Be a friendly anime waifu."
+
         if user_id and user_id in data.get('user_custom_styles', {}):
             system_message = data['user_custom_styles'][user_id]
-        
+
         messages = [{"role": "system", "content": system_message}]
-        
+
         if user_id and user_id in data.get('user_conversation_memory', {}):
             messages.extend(data['user_conversation_memory'][user_id])
-        
+
         messages.append({"role": "user", "content": prompt})
-        
+
         response = await openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=messages,
@@ -190,16 +198,16 @@ async def generate_text(prompt, user_id=None):
             frequency_penalty=0,
             presence_penalty=0
         )
-        
+
         ai_response = response.choices[0].message.content.strip()
-        
+
         if user_id and data['user_memory_preferences'].get(user_id, False):
             if user_id not in data['user_conversation_memory']:
                 data['user_conversation_memory'][user_id] = []
             data['user_conversation_memory'][user_id].append({"role": "user", "content": prompt})
             data['user_conversation_memory'][user_id].append({"role": "assistant", "content": ai_response})
             save_data(data)
-        
+
         return ai_response
     except Exception as e:
         return f"An error occurred: {str(e)}"
@@ -452,169 +460,165 @@ async def viewsetchannels(ctx):
 
 # Chatbot----------------------------------------------------------------------------------------------------------------------------------------
 
-# Autorespond (P)
-@bot.command
-@lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.option("toggle", "Toggle autorespond on or off.", choices=["on", "off"], type=hikari.OptionType.STRING)
-@lightbulb.command("autorespond", "Enable or disable autorespond in the server. (Premium Only)")
-@lightbulb.implements(lightbulb.SlashCommand)
-async def autorespond(ctx: lightbulb.Context):
-    user_id = str(ctx.author.id)
-    server_id = str(ctx.guild_id)
-    data = load_data()
+# # Autorespond (P)
+# @bot.command
+# @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
+# @lightbulb.option("toggle", "Toggle autorespond on or off.", choices=["on", "off"], type=hikari.OptionType.STRING)
+# @lightbulb.command("autorespond", "Enable or disable autorespond in the server. (Premium Only)")
+# @lightbulb.implements(lightbulb.SlashCommand)
+# async def autorespond(ctx: lightbulb.Context):
+#     user_id = str(ctx.author.id)
+#     server_id = str(ctx.guild_id)
+#     data = load_data()
 
-    prem_users = data.get('prem_users', {})
-    if user_id not in prem_users:
-        embed = hikari.Embed(
-            title="You found a premium command",
-            description=(
-                "To toggle Aiko to auto respond in your server, consider becoming a [supporter](http://ko-fi.com/azaelbots/tiers) for only $1.99 a month.\n\n"
-                "I will never paywall the main functions of the bot but these few extra commands help keep the bot running. ❤️\n\n"
-                "**Access Premium Commands Like:**\n"
-                "• Unlimited responses from Aiko.\n"
-                "• Have Aiko repond to every message in set channel(s).\n"
-                "• Add custom trigger-insult combos.\n"
-                "• Aiko will remember your conversations.\n"
-                "• Remove cool-downs.\n"
-                "**Support Server Related Perks Like:**\n"
-                "• Access to behind-the-scenes discord channels.\n"
-                "• Have a say in the development of Aiko.\n"
-                "• Supporter-exclusive channels.\n\n"
-                "*Any memberships bought can be refunded within 3 days of purchase.*"
-            ),
-            color=0x2B2D31
-        )
-        embed.set_image("https://i.imgur.com/rcgSVxC.gif")
-        await ctx.respond(embed=embed)
+#     prem_users = data.get('prem_users', {})
+#     if user_id not in prem_users:
+#         embed = hikari.Embed(
+#             title="You found a premium command",
+#             description=(
+#                 "To toggle Aiko to auto respond in your server, consider becoming a [supporter](http://ko-fi.com/azaelbots/tiers) for only $1.99 a month.\n\n"
+#                 "I will never paywall the main functions of the bot but these few extra commands help keep the bot running. ❤️\n\n"
+#                 "**Access Premium Commands Like:**\n"
+#                 "• Unlimited responses from Aiko.\n"
+#                 "• Have Aiko repond to every message in set channel(s).\n"
+#                 "• Add custom trigger-insult combos.\n"
+#                 "• Aiko will remember your conversations.\n"
+#                 "• Remove cool-downs.\n"
+#                 "**Support Server Related Perks Like:**\n"
+#                 "• Access to behind-the-scenes discord channels.\n"
+#                 "• Have a say in the development of Aiko.\n"
+#                 "• Supporter-exclusive channels.\n\n"
+#                 "*Any memberships bought can be refunded within 3 days of purchase.*"
+#             ),
+#             color=0x2B2D31
+#         )
+#         embed.set_image("https://i.imgur.com/rcgSVxC.gif")
+#         await ctx.respond(embed=embed)
 
-        try:
-            await bot.rest.create_message(1285303149682364548, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-        except Exception as e:
-            print(f"{e}")
-        return
+#         try:
+#             await bot.rest.create_message(1285303149682364548, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+#         except Exception as e:
+#             print(f"{e}")
+#         return
 
-    autorespond_servers = data.get('autorespond_servers', {})
-    allowed_ai_channel_per_guild = data.get('allowed_ai_channel_per_guild', {})
+#     autorespond_servers = data.get('autorespond_servers', {})
+#     allowed_ai_channel_per_guild = data.get('allowed_ai_channel_per_guild', {})
 
-    if server_id not in allowed_ai_channel_per_guild or not allowed_ai_channel_per_guild[server_id]:
-        await ctx.respond("Please set a channel for AI responses using the `/setchannel_toggle` command before enabling autorespond.")
-        return
+#     if server_id not in allowed_ai_channel_per_guild or not allowed_ai_channel_per_guild[server_id]:
+#         await ctx.respond("Please set a channel for AI responses using the `/setchannel_toggle` command before enabling autorespond.")
+#         return
 
-    toggle = ctx.options.toggle
-    if toggle == "on":
-        if not autorespond_servers.get(server_id):
-            autorespond_servers[server_id] = True
-            await ctx.respond("Autorespond has been enabled for this server.")
-        else:
-            await ctx.respond("Autorespond is already enabled for this server.")
-    elif toggle == "off":
-        if autorespond_servers.get(server_id):
-            autorespond_servers[server_id] = False
-            await ctx.respond("Autorespond has been disabled for this server.")
-        else:
-            await ctx.respond("Autorespond is already disabled for this server.")
+#     toggle = ctx.options.toggle
+#     if toggle == "on":
+#         if not autorespond_servers.get(server_id):
+#             autorespond_servers[server_id] = True
+#             await ctx.respond("Autorespond has been enabled for this server.")
+#         else:
+#             await ctx.respond("Autorespond is already enabled for this server.")
+#     elif toggle == "off":
+#         if autorespond_servers.get(server_id):
+#             autorespond_servers[server_id] = False
+#             await ctx.respond("Autorespond has been disabled for this server.")
+#         else:
+#             await ctx.respond("Autorespond is already disabled for this server.")
 
-    if user_id not in prem_users:
-        prem_users[user_id] = [server_id]
-    elif server_id not in prem_users[user_id]:
-        prem_users[user_id].append(server_id)
+#     if user_id not in prem_users:
+#         prem_users[user_id] = [server_id]
+#     elif server_id not in prem_users[user_id]:
+#         prem_users[user_id].append(server_id)
 
-    update_data({
-        'autorespond_servers': autorespond_servers,
-        'allowed_ai_channel_per_guild': allowed_ai_channel_per_guild,
-        'prem_users': prem_users
-    })
+#     update_data({
+#         'autorespond_servers': autorespond_servers,
+#         'allowed_ai_channel_per_guild': allowed_ai_channel_per_guild,
+#         'prem_users': prem_users
+#     })
 
-    try:
-        await bot.rest.create_message(1285303149682364548, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-    except Exception as e:
-        print(f"{e}")
+#     try:
+#         await bot.rest.create_message(1285303149682364548, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+#     except Exception as e:
+#         print(f"{e}")
 
-# Memory command (P)
-@bot.command()
-@lightbulb.option('toggle', 'Choose to toggle or clear memory.', choices=['on', 'off', 'clear'])
-@lightbulb.command('memory', 'Have Aiko remember your conversations. (Premium Only)')
-@lightbulb.implements(lightbulb.SlashCommand)
-async def memory(ctx: lightbulb.Context) -> None:
-    user_id = str(ctx.author.id)
-    toggle = ctx.options.toggle
-    data = load_data()
-    prem_users = data.get('prem_users', {})
-    if user_id not in prem_users:
-        embed = hikari.Embed(
-            title="You found a premium command",
-            description=(
-                "To toggle Aiko to remember your conversations, consider becoming a [supporter](http://ko-fi.com/azaelbots/tiers) for only $1.99 a month.\n\n"
-                "I will never paywall the main functions of the bot but these few extra commands help keep the bot running. ❤️\n\n"
-                "**Access Premium Commands Like:**\n"
-                "• Unlimited responses from Aiko.\n"
-                "• Have Aiko repond to every message in set channel(s).\n"
-                "• Add custom trigger-insult combos.\n"
-                "• Aiko will remember your conversations.\n"
-                "• Remove cool-downs.\n"
-                "**Support Server Related Perks Like:**\n"
-                "• Access to behind-the-scenes discord channels.\n"
-                "• Have a say in the development of Aiko.\n"
-                "• Supporter-exclusive channels.\n\n"
-                "*Any memberships bought can be refunded within 3 days of purchase.*"
-            ),
-            color=0x2B2D31
-        )
-        embed.set_image("https://i.imgur.com/rcgSVxC.gif")
-        await ctx.respond(embed=embed)
-        try:
-            await bot.rest.create_message(1285303149682364548, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-        except Exception as e:
-            print(f"{e}")
-        return
+# # Memory command (P)
+# @bot.command()
+# @lightbulb.option('toggle', 'Choose to toggle or clear memory.', choices=['on', 'off', 'clear'])
+# @lightbulb.command('memory', 'Have Aiko remember your conversations. (Premium Only)')
+# @lightbulb.implements(lightbulb.SlashCommand)
+# async def memory(ctx: lightbulb.Context) -> None:
+#     user_id = str(ctx.author.id)
+#     toggle = ctx.options.toggle
+#     data = load_data()
+#     prem_users = data.get('prem_users', {})
+#     if user_id not in prem_users:
+#         embed = hikari.Embed(
+#             title="You found a premium command",
+#             description=(
+#                 "To toggle Aiko to remember your conversations, consider becoming a [supporter](http://ko-fi.com/azaelbots/tiers) for only $1.99 a month.\n\n"
+#                 "I will never paywall the main functions of the bot but these few extra commands help keep the bot running. ❤️\n\n"
+#                 "**Access Premium Commands Like:**\n"
+#                 "• Unlimited responses from Aiko.\n"
+#                 "• Have Aiko repond to every message in set channel(s).\n"
+#                 "• Add custom trigger-insult combos.\n"
+#                 "• Aiko will remember your conversations.\n"
+#                 "• Remove cool-downs.\n"
+#                 "**Support Server Related Perks Like:**\n"
+#                 "• Access to behind-the-scenes discord channels.\n"
+#                 "• Have a say in the development of Aiko.\n"
+#                 "• Supporter-exclusive channels.\n\n"
+#                 "*Any memberships bought can be refunded within 3 days of purchase.*"
+#             ),
+#             color=0x2B2D31
+#         )
+#         embed.set_image("https://i.imgur.com/rcgSVxC.gif")
+#         await ctx.respond(embed=embed)
+#         try:
+#             await bot.rest.create_message(1285303149682364548, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+#         except Exception as e:
+#             print(f"{e}")
+#         return
 
-    if toggle == 'on':
-        data['user_memory_preferences'][user_id] = True
-        response_message = 'Memory has been turned on for personalized interactions.'
-    elif toggle == 'off':
-        data['user_memory_preferences'][user_id] = False
-        response_message = 'Memory has been turned off. Memory will not be cleared until you choose to clear it.'
-    elif toggle == 'clear':
-        data['user_conversation_memory'].pop(user_id, None)
-        response_message = 'Memory has been cleared.'
-    else:
-        response_message = 'Invalid action.'
+#     if toggle == 'on':
+#         data['user_memory_preferences'][user_id] = True
+#         response_message = 'Memory has been turned on for personalized interactions.'
+#     elif toggle == 'off':
+#         data['user_memory_preferences'][user_id] = False
+#         response_message = 'Memory has been turned off. Memory will not be cleared until you choose to clear it.'
+#     elif toggle == 'clear':
+#         data['user_conversation_memory'].pop(user_id, None)
+#         response_message = 'Memory has been cleared.'
+#     else:
+#         response_message = 'Invalid action.'
 
-    update_data({
-        'user_memory_preferences': data['user_memory_preferences'],
-        'user_conversation_memory': data['user_conversation_memory'],
-        'prem_users': prem_users
-    })
+#     update_data({
+#         'user_memory_preferences': data['user_memory_preferences'],
+#         'user_conversation_memory': data['user_conversation_memory'],
+#         'prem_users': prem_users
+#     })
 
-    await ctx.respond(response_message)
+#     await ctx.respond(response_message)
 
-    try:
-        await bot.rest.create_message(1285303149682364548, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-    except Exception as e:
-        print(f"{e}")
+#     try:
+#         await bot.rest.create_message(1285303149682364548, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+#     except Exception as e:
+#         print(f"{e}")
 
 # Set Style command
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.option('style', 'Enter your prefered AI style.', type=str)
-@lightbulb.command('style_set', 'Set a custom style for Aiko to respond with.')
+@lightbulb.option('personality', 'Choose a dere type for Aiko.', choices=list(DERE_TYPES.keys()), type=str)
+@lightbulb.command('set_personality', 'Set Aiko\'s dere type personality.')
 @lightbulb.implements(lightbulb.SlashCommand)
-async def setstyle(ctx: lightbulb.Context) -> None:
+async def set_personality(ctx: lightbulb.Context) -> None:
     user_id = str(ctx.author.id)
-    style = ctx.options.style
+    selected_personality = ctx.options.personality
 
     if user_id in prem_users:
         await ctx.command.cooldown_manager.reset_cooldown(ctx)
-    
-    if len(style) > 200:
-        await ctx.respond("Your style is too long. Keep it under 200 characters.")
-        return
 
     data = load_data()
-    data['user_custom_styles'][user_id] = style
+    data['user_custom_styles'][user_id] = DERE_TYPES[selected_personality]
     save_data(data)
-    
-    await ctx.respond(f'Custom response style has been set to: "{style}"')
+
+    await ctx.respond(f'Aiko\'s personality has been set to "{selected_personality.capitalize()}".')
 
     try:
         await bot.rest.create_message(1285303149682364548, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
@@ -624,38 +628,39 @@ async def setstyle(ctx: lightbulb.Context) -> None:
 # View style command    
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.command('style_view', 'View your current custom style.')
+@lightbulb.command('view_personality', 'View Aiko\'s current dere type personality.')
 @lightbulb.implements(lightbulb.SlashCommand)
-async def viewstyle(ctx: lightbulb.Context) -> None:
+async def view_personality(ctx: lightbulb.Context) -> None:
     user_id = str(ctx.author.id)
     data = load_data()
 
-    if user_id in data.get('user_custom_styles', {}):
-        style = data['user_custom_styles'][user_id]
-        await ctx.respond(f'Your current custom style is: "{style}"')
+    current_style = data.get('user_custom_styles', {}).get(user_id)
+    if current_style:
+        personality = next((key for key, value in DERE_TYPES.items() if value == current_style), "custom")
+        await ctx.respond(f'Aiko\'s current personality is set to: "{personality.capitalize()}".')
     else:
-        await ctx.respond("You haven't set a custom style yet.")
+        await ctx.respond("Aiko is currently using her default personality.")
 
     try:
         await bot.rest.create_message(1285303149682364548, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
         print(f"{e}")
 
-#Clear style command
+# Clear style command
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.command('style_clear', 'Clear your custom style.')
+@lightbulb.command('clear_personality', 'Clear Aiko\'s dere type personality.')
 @lightbulb.implements(lightbulb.SlashCommand)
-async def clearstyle(ctx: lightbulb.Context) -> None:
+async def clear_personality(ctx: lightbulb.Context) -> None:
     user_id = str(ctx.author.id)
     data = load_data()
 
     if user_id in data.get('user_custom_styles', {}):
         del data['user_custom_styles'][user_id]
         save_data(data)
-        await ctx.respond("Your custom style has been cleared.")
+        await ctx.respond("Aiko's personality has been cleared to default.")
     else:
-        await ctx.respond("You haven't set a custom style yet.")
+        await ctx.respond("Aiko is already using her default personality.")
 
     try:
         await bot.rest.create_message(1285303149682364548, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
@@ -678,16 +683,16 @@ async def help(ctx):
         description=(
             "Hello! I'm Aiko, your very own waifu chatbot! To talk to me, reply or ping me in channels or dms. Use the /setchannel_toggle command to set channels for me to respond in.\n\n"
             "For suggestions and help, feel free to join the [support server](https://discord.com/invite/x7MdgVFUwa). My developer will be happy to help! [Click here](https://discord.com/oauth2/authorize?client_id=1285298352308621416), to invite me to your server.\n\n"
-            "Use the `/claim` command to receive your perks after becoming a supporter.\n\n"
+            # "Use the `/claim` command to receive your perks after becoming a supporter.\n\n"
             "**Commands:**\n"
             "**/setchannel_toggle:** Restrict Aiko to particular channel(s).\n"
             "**/setchannel_view:** View channel(s) Aiko is restricted to.\n"
-            "**/autorespond:** Have Aiko respond to every message in a set channel(s). (P)\n"
-            "**/memory:** Make Aiko remember your conversations. (P)\n"
+            # "**/autorespond:** Have Aiko respond to every message in a set channel(s). (P)\n"
+            # "**/memory:** Make Aiko remember your conversations. (P)\n"
             "**/dere_set:** Set Aiko's personality.\n"
             "**/dere_view:** View Aiko's currently set personality.\n"
             "**/dere_clear:** Clear Aiko's personality back to default.\n\n"
-            "**To use (P) premium commands and help cover costs associated with running Aiko, consider becoming a [supporter](https://ko-fi.com/aza3l/tiers) for  $1.99 a month. ❤️**\n\n"
+            # "**To use (P) premium commands and help cover costs associated with running Aiko, consider becoming a [supporter](https://ko-fi.com/aza3l/tiers) for  $1.99 a month. ❤️**\n\n"
         ),
         color=0x2B2D31
     )
@@ -758,6 +763,43 @@ async def help(ctx):
 #             await bot.rest.create_message(1285303262127325301, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
 #         except Exception as e:
 #             print(f"{e}")
+
+# Privacy Policy Command
+@bot.command
+@lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
+@lightbulb.command("privacy", "View Aiko's Privacy Policy.")
+@lightbulb.implements(lightbulb.SlashCommand)
+async def privacy(ctx: lightbulb.Context) -> None:
+    if any(word in str(ctx.author.id) for word in prem_users):
+        await ctx.command.cooldown_manager.reset_cooldown(ctx)
+    embed = hikari.Embed(
+        title="Privacy Policy for Aiko.",
+        description=(
+            "**Last Updated:** 13/11/2024 (DD/MM/YYYY)\n\n"
+            "Aiko (\"the Bot\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use the Bot. By using the Bot, you agree to the terms of this Privacy Policy.\n\n"            
+            "__**Data Collection**__\n"
+            "**User Information:** We do not collect or store any personal information about users. For premium users, the Bot stores memory preferences and user-defined response styles locally.\n"
+            "**Usage Data:** We collect and store data on the usage of commands for analytical purposes. This data is anonymized and does not contain any personal information.\n\n"
+            "__**Collected Data Usage**__\n"
+            "**Usage Data:** Used to analyze and improve the Bot's functionality.\n"
+            "**User Customizations:** Premium settings personalize interactions.\n\n"
+            "__**Data Storage and Security**__\n"
+            "**Data Storage:** Stored securely and accessible only by authorized personnel.\n"
+            "**Security Measures:** Reasonable measures are implemented to protect data from unauthorized access, disclosure, or alteration.\n\n"
+            "__**Sharing of Information**__\n"
+            "We do not share any collected data with third parties. Data is solely used for internal analysis and improvements.\n\n"
+            "__**Changes to Privacy Policy**__\n"
+            "Changes will be updated here and at the support server. Continued use signifies acceptance of changes.\n\n"
+            "**If you wish to remove your data or have any questions, join the [support server](https://discord.gg/dgwAC8TFWP).**"
+        ),
+        color=0x2B2D31
+    )
+    await ctx.respond(embed=embed)
+
+    try:
+        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+    except Exception as e:
+        print(f"Error logging privacy command: {e}")
 
 # Error handling
 @bot.listen(lightbulb.CommandErrorEvent)

@@ -1,0 +1,21 @@
+{
+    "prem_users": {
+        "364400063281102852": [
+            924728966739279882,
+            "857112618963566592"
+        ]
+    },
+    "user_memory_preferences": {},
+    "user_conversation_memory": {},
+    "user_custom_styles": {
+        "364400063281102852": "You are a deeply affectionate and possessive waifu, with a hint of jealousy and protectiveness."
+    },
+    "allowed_ai_channel_per_guild": {
+        "857112618963566592": [
+            "924728966739279882"
+        ]
+    },
+    "autorespond_servers": {
+        "857112618963566592": true
+    }
+}
