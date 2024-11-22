@@ -1,11 +1,12 @@
 import hikari
 import lightbulb
-import os
-from openai import AsyncOpenAI
-import json
-import aiohttp
 import asyncio
+import aiohttp
+import os
 import re
+import json
+from dotenv import load_dotenv
+from openai import AsyncOpenAI
 
 DATA_FILE = 'data.json'
 
@@ -462,84 +463,6 @@ async def viewsetchannels(ctx):
 
 # Chatbot----------------------------------------------------------------------------------------------------------------------------------------
 
-# # Autorespond (P)
-# @bot.command
-# @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-# @lightbulb.option("toggle", "Toggle autorespond on or off.", choices=["on", "off"], type=hikari.OptionType.STRING)
-# @lightbulb.command("autorespond", "Enable or disable autorespond in the server. (Premium Only)")
-# @lightbulb.implements(lightbulb.SlashCommand)
-# async def autorespond(ctx: lightbulb.Context):
-#     user_id = str(ctx.author.id)
-#     server_id = str(ctx.guild_id)
-#     data = load_data()
-
-#     prem_users = data.get('prem_users', {})
-#     if user_id not in prem_users:
-#         embed = hikari.Embed(
-#             title="You found a premium command",
-#             description=(
-#                 "To toggle Aiko to auto respond in your server, consider becoming a [supporter](https://ko-fi.com/aza3l/tiers) for only $1.99 a month.\n\n"
-#                 "I will never paywall the main functions of the bot but these few extra commands help keep the bot running. ❤️\n\n"
-#                 "**Access Premium Commands Like:**\n"
-#                 "• Unlimited responses from Aiko.\n"
-#                 "• Have Aiko repond to every message in set channel(s).\n"
-#                 "• Add custom trigger-insult combos.\n"
-#                 "• Aiko will remember your conversations.\n"
-#                 "• Remove cool-downs.\n"
-#                 "**Support Server Related Perks Like:**\n"
-#                 "• Access to behind-the-scenes discord channels.\n"
-#                 "• Have a say in the development of Aiko.\n"
-#                 "• Supporter-exclusive channels.\n\n"
-#                 "*Any memberships bought can be refunded within 3 days of purchase.*"
-#             ),
-#             color=0x2B2D31
-#         )
-#         embed.set_image("https://i.imgur.com/rcgSVxC.gif")
-#         await ctx.respond(embed=embed)
-
-#         try:
-#             await bot.rest.create_message(1285303262127325301, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-#         except Exception as e:
-#             print(f"{e}")
-#         return
-
-#     autorespond_servers = data.get('autorespond_servers', {})
-#     allowed_ai_channel_per_guild = data.get('allowed_ai_channel_per_guild', {})
-
-#     if server_id not in allowed_ai_channel_per_guild or not allowed_ai_channel_per_guild[server_id]:
-#         await ctx.respond("Please set a channel for AI responses using the `/setchannel_toggle` command before enabling autorespond.")
-#         return
-
-#     toggle = ctx.options.toggle
-#     if toggle == "on":
-#         if not autorespond_servers.get(server_id):
-#             autorespond_servers[server_id] = True
-#             await ctx.respond("Autorespond has been enabled for this server.")
-#         else:
-#             await ctx.respond("Autorespond is already enabled for this server.")
-#     elif toggle == "off":
-#         if autorespond_servers.get(server_id):
-#             autorespond_servers[server_id] = False
-#             await ctx.respond("Autorespond has been disabled for this server.")
-#         else:
-#             await ctx.respond("Autorespond is already disabled for this server.")
-
-#     if user_id not in prem_users:
-#         prem_users[user_id] = [server_id]
-#     elif server_id not in prem_users[user_id]:
-#         prem_users[user_id].append(server_id)
-
-#     update_data({
-#         'autorespond_servers': autorespond_servers,
-#         'allowed_ai_channel_per_guild': allowed_ai_channel_per_guild,
-#         'prem_users': prem_users
-#     })
-
-#     try:
-#         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-#     except Exception as e:
-#         print(f"{e}")
-
 # # Memory command (P)
 # @bot.command()
 # @lightbulb.option('toggle', 'Choose to toggle or clear memory.', choices=['on', 'off', 'clear'])
@@ -684,7 +607,7 @@ async def help(ctx):
         title="📚 Help 📚",
         description=(
             "Hello! I'm Aiko, your very own waifu chatbot! To talk to me, reply or ping me in channels. Use the /setchannel_toggle command to set channels for me to respond in.\n\n"
-            "For suggestions and help, feel free to join the [support server](https://discord.com/invite/x7MdgVFUwa). My developer will be happy to help! [Click here](https://discord.com/oauth2/authorize?client_id=1285298352308621416), to invite me to your server.\n\n"
+            "For suggestions and help, feel free to join the [support server](https://discord.gg/dgwAC8TFWP). My developer will be happy to help! [Click here](https://discord.com/oauth2/authorize?client_id=1285298352308621416), to invite me to your server.\n\n"
             "Use the `/claim` command to receive your perks after becoming a supporter.\n\n"
             "**Commands:**\n"
             "**/setchannel_toggle:** Restrict Aiko to particular channel(s).\n"
@@ -705,66 +628,66 @@ async def help(ctx):
     except Exception as e:
         print(f"{e}")
 
-# # Claim command
-# @bot.command
-# @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-# @lightbulb.option("email", "Enter your Ko-fi email", type=str)
-# @lightbulb.command("claim", "Claim premium after subscribing.")
-# @lightbulb.implements(lightbulb.SlashCommand)
-# async def claim(ctx: lightbulb.Context) -> None:
-#     data = load_data()
-#     user_id = str(ctx.author.id)
-#     server_id = str(ctx.guild_id)
+# Claim command
+@bot.command
+@lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
+@lightbulb.option("email", "Enter your Ko-fi email", type=str)
+@lightbulb.command("claim", "Claim premium after subscribing.")
+@lightbulb.implements(lightbulb.SlashCommand)
+async def claim(ctx: lightbulb.Context) -> None:
+    data = load_data()
+    user_id = str(ctx.author.id)
+    server_id = str(ctx.guild_id)
 
-#     if user_id in data['prem_users']:
-#         await ctx.command.cooldown_manager.reset_cooldown(ctx)
-#         await ctx.respond("You already have premium. Thank you! ❤️")
-#         try:
-#             await bot.rest.create_message(1285303262127325301, f"`{ctx.author.id}` tried to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` but already had premium.")
-#         except Exception as e:
-#             print(f"{e}")
-#         return
+    if user_id in data['prem_users']:
+        await ctx.command.cooldown_manager.reset_cooldown(ctx)
+        await ctx.respond("You already have premium. Thank you! ❤️")
+        try:
+            await bot.rest.create_message(1285303262127325301, f"`{ctx.author.id}` tried to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` but already had premium.")
+        except Exception as e:
+            print(f"{e}")
+        return
     
-#     email = ctx.options.email
+    email = ctx.options.email
     
-#     if email in prem_email:
-#         if user_id not in data['prem_users']:
-#             data['prem_users'][user_id] = [server_id]
-#         else:
-#             if server_id not in data['prem_users'][user_id]:
-#                 data['prem_users'][user_id].append(server_id)
+    if email in prem_email:
+        if user_id not in data['prem_users']:
+            data['prem_users'][user_id] = [server_id]
+        else:
+            if server_id not in data['prem_users'][user_id]:
+                data['prem_users'][user_id].append(server_id)
         
-#         save_data(data)
-#         await ctx.respond("You have premium now! Thank you so much. ❤️")
+        save_data(data)
+        await ctx.respond("You have premium now! Thank you so much. ❤️")
         
-#         try:
-#             await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-#         except Exception as e:
-#             print(f"{e}")
-#     else:
-#         embed = hikari.Embed(
-#             title="Invite:",
-#             description=(
-#                 "Your email was not recognized. If you think this is an error, join the [support server](https://discord.gg/dgwAC8TFWP) to fix this issue.\n\n"
-#                 "If you haven't yet subscribed, consider doing so for $1.99 a month. It keeps me online and you receive perks listed below. ❤️\n\n"
-#                 "Premium Perks:\n"
-#                 "**Access Premium Features Like:**\n"
-#                 "• Unlimited responses from me.\n"
-#                 "• I will repond to every message in set channel(s).\n"
-#                 "• Unlimited memory: I will never forget our conversations.\n"
-#                 "• Remove cool-downs.\n"
-#                 "**Support Server Related Perks Like:**\n"
-#                 "• Access to behind the scenes discord channels.\n"
-#                 "• Have a say in the development of Aiko.\n"
-#                 "*Any memberships bought can be refunded within 3 days of purchase.*"
-#             ),
-#             color=0x2f3136
-#         )
-#         await ctx.respond(embed=embed)
-#         try:
-#             await bot.rest.create_message(1285303262127325301, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-#         except Exception as e:
-#             print(f"{e}")
+        try:
+            await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+        except Exception as e:
+            print(f"{e}")
+    else:
+        embed = hikari.Embed(
+            title="Invite:",
+            description=(
+                "Your email was not recognized. If you think this is an error, join the [support server](https://discord.gg/dgwAC8TFWP) to fix this issue.\n\n"
+                "If you haven't yet subscribed, consider doing so for $1.99 a month. It keeps me online and you receive perks listed below. ❤️\n\n"
+                "Premium Perks:\n"
+                "**Access Premium Features Like:**\n"
+                "• Unlimited responses from me.\n"
+                "• I will repond to every message in set channel(s).\n"
+                "• Unlimited memory: I will never forget our conversations.\n"
+                "• Remove cool-downs.\n"
+                "**Support Server Related Perks Like:**\n"
+                "• Access to behind the scenes discord channels.\n"
+                "• Have a say in the development of Aiko.\n"
+                "*Any memberships bought can be refunded within 3 days of purchase.*"
+            ),
+            color=0x2f3136
+        )
+        await ctx.respond(embed=embed)
+        try:
+            await bot.rest.create_message(1285303262127325301, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+        except Exception as e:
+            print(f"{e}")
 
 # Privacy Policy Command
 @bot.command
@@ -807,7 +730,7 @@ async def privacy(ctx: lightbulb.Context) -> None:
 @bot.listen(lightbulb.CommandErrorEvent)
 async def on_error(event: lightbulb.CommandErrorEvent) -> None:
 	if isinstance(event.exception, lightbulb.CommandInvocationError):
-		await event.context.respond(f"Uh oh, something went wrong, please try again. If this issue keeps persisting, join the [support server](https://discord.com/invite/x7MdgVFUwa) to have your issue resolved.")
+		await event.context.respond(f"Uh oh, something went wrong, please try again. If this issue keeps persisting, join the [support server](https://discord.gg/dgwAC8TFWP) to have your issue resolved.")
 		raise event.exception
 
 	exception = event.exception.__cause__ or event.exception
