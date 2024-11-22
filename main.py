@@ -60,53 +60,60 @@ DERE_TYPES = {
 bot = lightbulb.BotApp(token=os.getenv("BOT_TOKEN"))
 openai_client = AsyncOpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-# # Top.gg
-# class TopGGClient:
-#     def __init__(self, bot, token):
-#         self.bot = bot
-#         self.token = token
-#         self.session = aiohttp.ClientSession()
+# Top.gg
+class TopGGClient:
+    def __init__(self, bot, token):
+        self.bot = bot
+        self.token = token
+        self.session = None
 
-#     async def post_guild_count(self, count):
-#         url = f"https://top.gg/api/bots/{self.bot.get_me().id}/stats"
-#         headers = {
-#             "Authorization": self.token
-#         }
-#         payload = {
-#             "server_count": count
-#         }
-#         async with self.session.post(url, json=payload, headers=headers) as response:
-#             if response.status != 200:
-#                 print(f"Failed to post guild count to Top.gg: {response.status}")
-#             else:
-#                 print("Posted server count to Top.gg")
+    async def setup(self):
+        """Initialize the aiohttp.ClientSession in an async context."""
+        self.session = aiohttp.ClientSession()
 
-#     async def get_user_vote(self, user_id):
-#         url = f"https://top.gg/api/bots/{self.bot.get_me().id}/check?userId={user_id}"
-#         headers = {
-#             "Authorization": self.token
-#         }
-#         try:
-#             async with self.session.get(url, headers=headers) as response:
-#                 if response.status == 200:
-#                     data = await response.json()
-#                     return data.get('voted') == 1
-#                 else:
-#                     print(f"Failed to check user vote: {response.status}")
-#                     return False
-#         except Exception as e:
-#             print(f"An error occurred while checking user vote: {e}")
-#             return False
+    async def post_guild_count(self, count):
+        """Post the guild count to Top.gg."""
+        if not self.session:
+            raise RuntimeError("Client session is not initialized. Call setup() first.")
+        url = f"https://top.gg/api/bots/{self.bot.get_me().id}/stats"
+        headers = {"Authorization": self.token}
+        payload = {"server_count": count}
+        async with self.session.post(url, json=payload, headers=headers) as response:
+            if response.status != 200:
+                print(f"Failed to post guild count to Top.gg: {response.status}")
+            else:
+                print("Posted server count to Top.gg")
 
-#     async def close(self):
-#         await self.session.close()
+    async def get_user_vote(self, user_id):
+        """Check if a user has voted for the bot on Top.gg."""
+        if not self.session:
+            raise RuntimeError("Client session is not initialized. Call setup() first.")
+        url = f"https://top.gg/api/bots/{self.bot.get_me().id}/check?userId={user_id}"
+        headers = {"Authorization": self.token}
+        try:
+            async with self.session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get('voted') == 1
+                else:
+                    print(f"Failed to check user vote: {response.status}")
+                    return False
+        except Exception as e:
+            print(f"An error occurred while checking user vote: {e}")
+            return False
 
-# topgg_token = os.getenv("TOPGG_TOKEN")
-# topgg_client = TopGGClient(bot, topgg_token)
+    async def close(self):
+        """Close the aiohttp.ClientSession."""
+        if self.session:
+            await self.session.close()
+
+topgg_token = os.getenv("TOPGG_TOKEN")
+topgg_client = TopGGClient(bot, topgg_token)
 
 # Presence
 @bot.listen(hikari.StartedEvent)
-async def on_starting(event: hikari.StartedEvent) -> None:
+async def on_starting(event: hikari.StartedEvent):
+    await topgg_client.setup()  # Initialize aiohttp.ClientSession
     while True:
         guilds = await bot.rest.fetch_my_guilds()
         server_count = len(guilds)
@@ -116,7 +123,7 @@ async def on_starting(event: hikari.StartedEvent) -> None:
                 type=hikari.ActivityType.WATCHING,
             )
         )
-        # await topgg_client.post_guild_count(server_count)
+        await topgg_client.post_guild_count(server_count)  # Call the method here
         await asyncio.sleep(3600)
 
 # Email
@@ -270,13 +277,13 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
 
         if user_id not in prem_users:
             if user_response_count.get(user_id, 0) >= 20:
-                # has_voted = await topgg_client.get_user_vote(user_id)
-                if True:# if not has_voted:
+                has_voted = await topgg_client.get_user_vote(user_id)
+                if not has_voted:
                     embed = hikari.Embed(
                         title="Limit Reached :(",
                         description=(
                             f"{event.message.author.mention}, limit resets in `6 hours`.\n\n"
-                            "If you want to continue for free, [vote](https://top.gg/bot/801431445452750879/vote) to gain unlimited access for the next 12 hours or become a [supporter](https://ko-fi.com/azaelbots) for $1.99 a month.\n\n"
+                            "If you want to continue for free, [vote](https://top.gg/bot/1285298352308621416/vote) to gain unlimited access for the next 12 hours or become a [supporter](https://ko-fi.com/aza3l/tiers) for $1.99 a month.\n\n"
                             "I will never completely paywall my bot, but limits like this lower running costs and keep the bot running. ❤️\n\n"
                             "**Access Premium Commands Like:**\n"
                             "• Unlimited responses from Aiko.\n"
@@ -292,7 +299,6 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
                         ),
                         color=0x2B2D31
                     )
-                    embed.set_image("https://i.imgur.com/rcgSVxC.gif")
                     await event.message.respond(embed=embed)
                     await bot.rest.create_message(1285303262127325301, f"Voting message sent in `{event.get_guild().name}` to `{event.author.id}`.")
 
@@ -317,13 +323,13 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
 
         if user_id not in prem_users:
             if user_response_count.get(user_id, 0) >= 20:
-                # has_voted = await topgg_client.get_user_vote(user_id)
-                if True:# if not has_voted:
+                has_voted = await topgg_client.get_user_vote(user_id)
+                if not has_voted:
                     embed = hikari.Embed(
                         title="Limit Reached :(",
                         description=(
                             f"{event.message.author.mention}, limit resets in `6 hours`.\n\n"
-                            "If you want to continue for free, [vote](https://top.gg/bot/801431445452750879/vote) to gain unlimited access for the next 12 hours or become a [supporter](https://ko-fi.com/azaelbots) for $1.99 a month.\n\n"
+                            "If you want to continue for free, [vote](https://top.gg/bot/1285298352308621416/vote) to gain unlimited access for the next 12 hours or become a [supporter](https://ko-fi.com/aza3l/tiers) for $1.99 a month.\n\n"
                             "I will never completely paywall my bot, but limits like this lower running costs and keep the bot running. ❤️\n\n"
                             "**Access Premium Commands Like:**\n"
                             "• Unlimited responses from Aiko.\n"
@@ -339,7 +345,6 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
                         ),
                         color=0x2B2D31
                     )
-                    embed.set_image("https://i.imgur.com/rcgSVxC.gif")
                     await event.message.respond(embed=embed)
                     await bot.rest.create_message(1285303262127325301, f"Voting message sent in `{event.get_guild().name}` to `{event.author.id}`.")
 
@@ -473,7 +478,7 @@ async def viewsetchannels(ctx):
 #         embed = hikari.Embed(
 #             title="You found a premium command",
 #             description=(
-#                 "To toggle Aiko to auto respond in your server, consider becoming a [supporter](http://ko-fi.com/azaelbots/tiers) for only $1.99 a month.\n\n"
+#                 "To toggle Aiko to auto respond in your server, consider becoming a [supporter](https://ko-fi.com/aza3l/tiers) for only $1.99 a month.\n\n"
 #                 "I will never paywall the main functions of the bot but these few extra commands help keep the bot running. ❤️\n\n"
 #                 "**Access Premium Commands Like:**\n"
 #                 "• Unlimited responses from Aiko.\n"
@@ -549,7 +554,7 @@ async def viewsetchannels(ctx):
 #         embed = hikari.Embed(
 #             title="You found a premium command",
 #             description=(
-#                 "To toggle Aiko to remember your conversations, consider becoming a [supporter](http://ko-fi.com/azaelbots/tiers) for only $1.99 a month.\n\n"
+#                 "To toggle Aiko to remember your conversations, consider becoming a [supporter](https://ko-fi.com/aza3l/tiers) for only $1.99 a month.\n\n"
 #                 "I will never paywall the main functions of the bot but these few extra commands help keep the bot running. ❤️\n\n"
 #                 "**Access Premium Commands Like:**\n"
 #                 "• Unlimited responses from Aiko.\n"
@@ -680,7 +685,7 @@ async def help(ctx):
         description=(
             "Hello! I'm Aiko, your very own waifu chatbot! To talk to me, reply or ping me in channels. Use the /setchannel_toggle command to set channels for me to respond in.\n\n"
             "For suggestions and help, feel free to join the [support server](https://discord.com/invite/x7MdgVFUwa). My developer will be happy to help! [Click here](https://discord.com/oauth2/authorize?client_id=1285298352308621416), to invite me to your server.\n\n"
-            # "Use the `/claim` command to receive your perks after becoming a supporter.\n\n"
+            "Use the `/claim` command to receive your perks after becoming a supporter.\n\n"
             "**Commands:**\n"
             "**/setchannel_toggle:** Restrict Aiko to particular channel(s).\n"
             "**/setchannel_view:** View channel(s) Aiko is restricted to.\n"
@@ -689,7 +694,7 @@ async def help(ctx):
             "**/dere_set:** Set Aiko's personality.\n"
             "**/dere_view:** View Aiko's currently set personality.\n"
             "**/dere_clear:** Clear Aiko's personality back to default.\n\n"
-            # "**To use (P) premium commands and help cover costs associated with running Aiko, consider becoming a [supporter](https://ko-fi.com/aza3l/tiers) for  $1.99 a month. ❤️**\n\n"
+            "**To use (P) premium commands and help cover costs associated with running Aiko, consider becoming a [supporter](https://ko-fi.com/aza3l/tiers) for  $1.99 a month. ❤️**\n\n"
         ),
         color=0x2B2D31
     )
@@ -812,9 +817,9 @@ async def on_error(event: lightbulb.CommandErrorEvent) -> None:
 	else:
 		raise exception
 
-# # Top.gg stop
-# @bot.listen(hikari.StoppedEvent)
-# async def on_stopping(event: hikari.StoppedEvent) -> None:
-#     await topgg_client.close()
+# Top.gg stop
+@bot.listen(hikari.StoppedEvent)
+async def on_stopping(event: hikari.StoppedEvent):
+    await topgg_client.close()
 
 bot.run()
