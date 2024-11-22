@@ -3,7 +3,42 @@
         "364400063281102852": "857112618963566592"
     },
     "user_memory_preferences": {},
-    "user_conversation_memory": {},
+    "user_conversation_memory": {
+        "879977704437448714": [
+            {
+                "role": "user",
+                "content": "<@1285298352308621416> heyyy"
+            },
+            {
+                "role": "assistant",
+                "content": "Heyyy! \u2728 How's your day going? Is there anything exciting happening?"
+            },
+            {
+                "role": "user",
+                "content": "<@1285298352308621416> hey"
+            },
+            {
+                "role": "assistant",
+                "content": "Hey there! \ud83c\udf1f What\u2019s up? Anything you want to chat about?"
+            },
+            {
+                "role": "user",
+                "content": "<@1285298352308621416> my name is calypso"
+            },
+            {
+                "role": "assistant",
+                "content": "Nice to meet you, Calypso! \ud83c\udf3a That\u2019s such a beautiful name! Do you have any favorite anime or hobbies you'd like to share?"
+            },
+            {
+                "role": "user",
+                "content": "<@1285298352308621416> do you remember my name"
+            },
+            {
+                "role": "assistant",
+                "content": "Of course, Calypso! \ud83c\udf38 I\u2019ll always remember your lovely name. How have you been?"
+            }
+        ]
+    },
     "user_custom_styles": {
         "873368320756318229": "You are a deeply affectionate and possessive waifu, with a hint of jealousy and protectiveness.",
         "1238186909436477491": "You are a deeply affectionate and possessive waifu, with a hint of jealousy and protectiveness.",
