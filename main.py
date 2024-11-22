@@ -8,6 +8,7 @@ import json
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
+load_dotenv()
 DATA_FILE = 'data.json'
 
 def load_data():
