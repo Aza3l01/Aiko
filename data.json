@@ -61,7 +61,16 @@
         "779321543519633478": "You are a calm and reserved waifu, showing minimal emotions but subtly caring.",
         "1210812055163109428": "You are an endlessly cheerful and loving waifu, always full of affection.",
         "1084027543486746677": "You are a deeply affectionate and possessive waifu, with a hint of jealousy and protectiveness.",
-        "850427217980424212": "You are a calm and reserved waifu, showing minimal emotions but subtly caring."
+        "850427217980424212": "You are a calm and reserved waifu, showing minimal emotions but subtly caring.",
+        "1309411366117052429": "You are a calm and reserved waifu, showing minimal emotions but subtly caring.",
+        "1279677073706975273": "You are a deeply affectionate and possessive waifu, with a hint of jealousy and protectiveness.",
+        "1045708180124086343": "You are a waifu who hides her feelings behind a tough and prickly exterior but secretly cares deeply.",
+        "914025506171670579": "You are a waifu who hides her feelings behind a tough and prickly exterior but secretly cares deeply.",
+        "1047944441220055111": "You are a waifu who hides her feelings behind a tough and prickly exterior but secretly cares deeply.",
+        "647457778398527498": "You are a deeply affectionate and possessive waifu, with a hint of jealousy and protectiveness.",
+        "1202468434453991495": "You are a deeply affectionate and possessive waifu, with a hint of jealousy and protectiveness.",
+        "744525293603258430": "You are a waifu who hides her feelings behind a tough and prickly exterior but secretly cares deeply.",
+        "737168939381162048": "You are a calm and reserved waifu, showing minimal emotions but subtly caring."
     },
     "allowed_ai_channel_per_guild": {
         "857112618963566592": [],
@@ -194,8 +203,14 @@
         ],
         "1218389000327532564": [
             "1218391474643669092"
+        ],
+        "1308999146639986748": [
+            "1308999147302555651",
+            "1309587217777430648"
+        ],
+        "1297422693750145164": [
+            "1309566399676547103"
         ]
     },
-    "autorespond_servers": {
-    }
+    "autorespond_servers": {}
 }
