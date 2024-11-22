@@ -223,144 +223,132 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
     if event.message.author.is_bot:
         return
 
-    content = event.message.content or ""
-    bot_id = bot.get_me().id
-    bot_mention = f"<@{bot_id}>"
-    mentions_bot = bot_mention in content
-    references_message = event.message.message_reference is not None
+    user_id = str(event.message.author.id)
+    data = load_data()
+    prem_users = data.get('prem_users', {})
 
-    if references_message:
-        referenced_message_id = event.message.message_reference.id
-        if referenced_message_id:
-            try:
-                referenced_message = await bot.rest.fetch_message(event.channel_id, referenced_message_id)
-                is_reference_to_bot = referenced_message.author.id == bot_id
-            except (hikari.errors.ForbiddenError, hikari.errors.NotFoundError):
-                is_reference_to_bot = False
-            except hikari.errors.BadRequestError as e:
-                print(f"BadRequestError: {e}")
+    if isinstance(event, hikari.DMMessageCreateEvent):
+        # Handle Direct Messages
+        if user_id not in prem_users:
+            # Respond to non-premium users in DMs
+            await event.message.respond(
+                "DM interactions are restricted to premium users. "
+                "Consider subscribing to premium for access! ❤️"
+            )
+            return
+
+        # Respond to premium users in DMs
+        prompt = event.message.content.strip()
+        async with bot.rest.trigger_typing(event.channel_id):
+            response = await generate_text(prompt, user_id)
+        await event.message.respond(response)
+        return
+
+    elif isinstance(event, hikari.GuildMessageCreateEvent):
+        # Handle Guild Messages
+        content = event.message.content or ""
+        guild_id = str(event.guild_id)
+        channel_id = str(event.channel_id)
+        current_time = asyncio.get_event_loop().time()
+        reset_time = user_reset_time.get(user_id, 0)
+        bot_id = bot.get_me().id
+        bot_mention = f"<@{bot_id}>"
+        mentions_bot = bot_mention in content
+        references_message = event.message.message_reference is not None
+
+        if references_message:
+            referenced_message_id = event.message.message_reference.id
+            if referenced_message_id:
+                try:
+                    referenced_message = await bot.rest.fetch_message(event.channel_id, referenced_message_id)
+                    is_reference_to_bot = referenced_message.author.id == bot_id
+                except (hikari.errors.ForbiddenError, hikari.errors.NotFoundError):
+                    is_reference_to_bot = False
+                except hikari.errors.BadRequestError as e:
+                    print(f"BadRequestError: {e}")
+                    is_reference_to_bot = False
+            else:
                 is_reference_to_bot = False
         else:
             is_reference_to_bot = False
-    else:
-        is_reference_to_bot = False
 
-    guild_id = str(event.guild_id)
-    channel_id = str(event.channel_id)
+        autorespond_servers = data.get('autorespond_servers', {})
+        allowed_ai_channel_per_guild = data.get('allowed_ai_channel_per_guild', {})
 
-    data = load_data()
-    autorespond_servers = data.get('autorespond_servers', {})
-    prem_users = data.get('prem_users', {})
-    allowed_ai_channel_per_guild = data.get('allowed_ai_channel_per_guild', {})
+        if autorespond_servers.get(guild_id):
+            allowed_channels = allowed_ai_channel_per_guild.get(guild_id, [])
+            if allowed_channels and channel_id not in allowed_channels:
+                return
 
-    user_id = str(event.message.author.id)
-    current_time = asyncio.get_event_loop().time()
-    reset_time = user_reset_time.get(user_id, 0)
-
-    if user_id in user_limit_reached:
-        if current_time - user_limit_reached[user_id] < 21600:
-            return
-        else:
-            del user_limit_reached[user_id]
-
-    if autorespond_servers.get(guild_id):
-        allowed_channels = allowed_ai_channel_per_guild.get(guild_id, [])
-        if allowed_channels and channel_id not in allowed_channels:
-            return
-
-        if current_time - reset_time > 21600:
-            user_response_count[user_id] = 0
-            user_reset_time[user_id] = current_time
-        else:
-            if user_id not in user_response_count:
+            if current_time - reset_time > 21600:
                 user_response_count[user_id] = 0
                 user_reset_time[user_id] = current_time
+            else:
+                if user_id not in user_response_count:
+                    user_response_count[user_id] = 0
+                    user_reset_time[user_id] = current_time
 
-        if user_id not in prem_users:
-            if user_response_count.get(user_id, 0) >= 20:
-                has_voted = await topgg_client.get_user_vote(user_id)
-                if not has_voted:
-                    embed = hikari.Embed(
-                        title="Limit Reached :(",
-                        description=(
-                            f"{event.message.author.mention}, limit resets in `6 hours`.\n\n"
-                            "If you want to continue for free, [vote](https://top.gg/bot/1285298352308621416/vote) to gain unlimited access for the next 12 hours or become a [supporter](https://ko-fi.com/aza3l/tiers) for $1.99 a month.\n\n"
-                            "I will never completely paywall my bot, but limits like this lower running costs and keep the bot running. ❤️\n\n"
-                            "**Access Premium Commands Like:**\n"
-                            "• Unlimited responses from Aiko.\n"
-                            "• Have Aiko respond to every message in set channel(s).\n"
-                            "• Add custom trigger-insult combos.\n"
-                            "• Aiko will remember your conversations.\n"
-                            "• Remove cool-downs.\n"
-                            "**Support Server Related Perks Like:**\n"
-                            "• Access to behind the scenes discord channels.\n"
-                            "• Have a say in the development of Aiko.\n"
-                            "• Supporter exclusive channels.\n\n"
-                            "*Any memberships bought can be refunded within 3 days of purchase.*"
-                        ),
-                        color=0x2B2D31
-                    )
-                    await event.message.respond(embed=embed)
-                    await bot.rest.create_message(1285303262127325301, f"Voting message sent in `{event.get_guild().name}` to `{event.author.id}`.")
+            if user_id not in prem_users:
+                if user_response_count.get(user_id, 0) >= 20:
+                    has_voted = await topgg_client.get_user_vote(user_id)
+                    if not has_voted:
+                        embed = hikari.Embed(
+                            title="Limit Reached :(",
+                            description=(
+                                f"{event.message.author.mention}, limit resets in `6 hours`.\n\n"
+                                "If you want to continue for free, [vote](https://top.gg/bot/1285298352308621416/vote) to gain unlimited access for the next 12 hours "
+                                "or become a [supporter](https://ko-fi.com/aza3l/tiers) for $1.99 a month.\n\n"
+                                "I will never completely paywall my bot, but limits like this lower running costs and keep the bot running. ❤️"
+                            ),
+                            color=0x2B2D31
+                        )
+                        await event.message.respond(embed=embed)
+                        user_limit_reached[user_id] = current_time
+                        return
 
-                    user_limit_reached[user_id] = current_time
-                    return
+            async with bot.rest.trigger_typing(channel_id):
+                ai_response = await generate_text(content, user_id)
 
-        async with bot.rest.trigger_typing(channel_id):
-            ai_response = await generate_text(content, user_id)
-
-        user_response_count[user_id] = user_response_count.get(user_id, 0) + 1
-        response_message = f"{event.message.author.mention} {ai_response}"
-        try:
-            await event.message.respond(response_message)
-        except hikari.errors.ForbiddenError:
-            pass
-        return
-
-    if mentions_bot or is_reference_to_bot:
-        allowed_channels = allowed_ai_channel_per_guild.get(guild_id, [])
-        if allowed_channels and channel_id not in allowed_channels:
+            user_response_count[user_id] = user_response_count.get(user_id, 0) + 1
+            response_message = f"{event.message.author.mention} {ai_response}"
+            try:
+                await event.message.respond(response_message)
+            except hikari.errors.ForbiddenError:
+                pass
             return
 
-        if user_id not in prem_users:
-            if user_response_count.get(user_id, 0) >= 20:
-                has_voted = await topgg_client.get_user_vote(user_id)
-                if not has_voted:
-                    embed = hikari.Embed(
-                        title="Limit Reached :(",
-                        description=(
-                            f"{event.message.author.mention}, limit resets in `6 hours`.\n\n"
-                            "If you want to continue for free, [vote](https://top.gg/bot/1285298352308621416/vote) to gain unlimited access for the next 12 hours or become a [supporter](https://ko-fi.com/aza3l/tiers) for $1.99 a month.\n\n"
-                            "I will never completely paywall my bot, but limits like this lower running costs and keep the bot running. ❤️\n\n"
-                            "**Access Premium Commands Like:**\n"
-                            "• Unlimited responses from Aiko.\n"
-                            "• Have Aiko respond to every message in set channel(s).\n"
-                            "• Add custom trigger-insult combos.\n"
-                            "• Aiko will remember your conversations.\n"
-                            "• Remove cool-downs.\n"
-                            "**Support Server Related Perks Like:**\n"
-                            "• Access to behind the scenes discord channels.\n"
-                            "• Have a say in the development of Aiko.\n"
-                            "• Supporter exclusive channels.\n\n"
-                            "*Any memberships bought can be refunded within 3 days of purchase.*"
-                        ),
-                        color=0x2B2D31
-                    )
-                    await event.message.respond(embed=embed)
-                    await bot.rest.create_message(1285303262127325301, f"Voting message sent in `{event.get_guild().name}` to `{event.author.id}`.")
+        if mentions_bot or is_reference_to_bot:
+            allowed_channels = allowed_ai_channel_per_guild.get(guild_id, [])
+            if allowed_channels and channel_id not in allowed_channels:
+                return
 
-                    user_limit_reached[user_id] = current_time
-                    return
+            if user_id not in prem_users:
+                if user_response_count.get(user_id, 0) >= 20:
+                    has_voted = await topgg_client.get_user_vote(user_id)
+                    if not has_voted:
+                        embed = hikari.Embed(
+                            title="Limit Reached :(",
+                            description=(
+                                f"{event.message.author.mention}, limit resets in `6 hours`.\n\n"
+                                "If you want to continue for free, [vote](https://top.gg/bot/1285298352308621416/vote) to gain unlimited access for the next 12 hours "
+                                "or become a [supporter](https://ko-fi.com/aza3l/tiers) for $1.99 a month.\n\n"
+                                "I will never completely paywall my bot, but limits like this lower running costs and keep the bot running. ❤️"
+                            ),
+                            color=0x2B2D31
+                        )
+                        await event.message.respond(embed=embed)
+                        user_limit_reached[user_id] = current_time
+                        return
 
-        async with bot.rest.trigger_typing(channel_id):
-            ai_response = await generate_text(content, user_id)
+            async with bot.rest.trigger_typing(channel_id):
+                ai_response = await generate_text(content, user_id)
 
-        user_response_count[user_id] = user_response_count.get(user_id, 0) + 1
-        response_message = f"{event.message.author.mention} {ai_response}"
-        try:
-            await event.message.respond(response_message)
-        except hikari.errors.ForbiddenError:
-            pass
+            user_response_count[user_id] = user_response_count.get(user_id, 0) + 1
+            response_message = f"{event.message.author.mention} {ai_response}"
+            try:
+                await event.message.respond(response_message)
+            except hikari.errors.ForbiddenError:
+                pass
 
 # Setchannel----------------------------------------------------------------------------------------------------------------------------------------
 
