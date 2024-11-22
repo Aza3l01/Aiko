@@ -183,14 +183,28 @@ async def generate_text(prompt, user_id=None):
     try:
         data = load_data()
         system_message = "Be a friendly anime waifu."
+        memory_limit = 20
+
+        is_premium = user_id in data.get('prem_users', {})
+        user_memory = data.get('user_conversation_memory', {}).get(user_id, [])
+        limit_reached_flag = data.get("limit_reached_flag", {})
 
         if user_id and user_id in data.get('user_custom_styles', {}):
             system_message = data['user_custom_styles'][user_id]
 
         messages = [{"role": "system", "content": system_message}]
+        if user_id:
+            if not is_premium and len(user_memory) >= memory_limit:
+                if not limit_reached_flag.get(user_id, False):
+                    limit_reached_flag[user_id] = True
+                    save_data({"limit_reached_flag": limit_reached_flag})
+                    return (
+                        f"You've almost reached your memory limit :( I'll now forget older messages as new memories with you are added. "
+                        "To continue without memory limits, consider becoming a [supporter](https://ko-fi.com/aza3l/tiers) for  $1.99 a month. ❤️"
+                    )
+                user_memory = user_memory[-(memory_limit - 1):]
 
-        if user_id and user_id in data.get('user_conversation_memory', {}):
-            messages.extend(data['user_conversation_memory'][user_id])
+            messages.extend(user_memory)
 
         messages.append({"role": "user", "content": prompt})
 
@@ -206,11 +220,16 @@ async def generate_text(prompt, user_id=None):
 
         ai_response = response.choices[0].message.content.strip()
 
-        if user_id and data['user_memory_preferences'].get(user_id, False):
+        if user_id:
             if user_id not in data['user_conversation_memory']:
                 data['user_conversation_memory'][user_id] = []
             data['user_conversation_memory'][user_id].append({"role": "user", "content": prompt})
             data['user_conversation_memory'][user_id].append({"role": "assistant", "content": ai_response})
+
+            # Save trimmed memory back
+            if not is_premium and len(data['user_conversation_memory'][user_id]) > memory_limit * 2:
+                data['user_conversation_memory'][user_id] = data['user_conversation_memory'][user_id][-(memory_limit * 2):]
+
             save_data(data)
 
         return ai_response
@@ -232,8 +251,8 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
         if user_id not in prem_users:
             # Respond to non-premium users in DMs
             await event.message.respond(
-                "DM interactions are restricted to premium users. "
-                "Consider subscribing to premium for access! ❤️"
+                "I can only talk to supporters in DMs but you can talk to me in servers. "
+                "If you want to talk to me in DMs, consider becoming a [supporter](https://ko-fi.com/aza3l/tiers) for  $1.99 a month. ❤️"
             )
             return
 
@@ -350,7 +369,7 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
             except hikari.errors.ForbiddenError:
                 pass
 
-# Setchannel----------------------------------------------------------------------------------------------------------------------------------------
+# Commands----------------------------------------------------------------------------------------------------------------------------------------
 
 # Setchannel command
 @bot.command
@@ -449,71 +468,6 @@ async def viewsetchannels(ctx):
     except Exception as e:
         print(f"{e}")
 
-# Chatbot----------------------------------------------------------------------------------------------------------------------------------------
-
-# # Memory command (P)
-# @bot.command()
-# @lightbulb.option('toggle', 'Choose to toggle or clear memory.', choices=['on', 'off', 'clear'])
-# @lightbulb.command('memory', 'Have Aiko remember your conversations. (Premium Only)')
-# @lightbulb.implements(lightbulb.SlashCommand)
-# async def memory(ctx: lightbulb.Context) -> None:
-#     user_id = str(ctx.author.id)
-#     toggle = ctx.options.toggle
-#     data = load_data()
-#     prem_users = data.get('prem_users', {})
-#     if user_id not in prem_users:
-#         embed = hikari.Embed(
-#             title="You found a premium command",
-#             description=(
-#                 "To toggle Aiko to remember your conversations, consider becoming a [supporter](https://ko-fi.com/aza3l/tiers) for only $1.99 a month.\n\n"
-#                 "I will never paywall the main functions of the bot but these few extra commands help keep the bot running. ❤️\n\n"
-#                 "**Access Premium Commands Like:**\n"
-#                 "• Unlimited responses from Aiko.\n"
-#                 "• Have Aiko repond to every message in set channel(s).\n"
-#                 "• Add custom trigger-insult combos.\n"
-#                 "• Aiko will remember your conversations.\n"
-#                 "• Remove cool-downs.\n"
-#                 "**Support Server Related Perks Like:**\n"
-#                 "• Access to behind-the-scenes discord channels.\n"
-#                 "• Have a say in the development of Aiko.\n"
-#                 "• Supporter-exclusive channels.\n\n"
-#                 "*Any memberships bought can be refunded within 3 days of purchase.*"
-#             ),
-#             color=0x2B2D31
-#         )
-#         embed.set_image("https://i.imgur.com/rcgSVxC.gif")
-#         await ctx.respond(embed=embed)
-#         try:
-#             await bot.rest.create_message(1285303262127325301, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-#         except Exception as e:
-#             print(f"{e}")
-#         return
-
-#     if toggle == 'on':
-#         data['user_memory_preferences'][user_id] = True
-#         response_message = 'Memory has been turned on for personalized interactions.'
-#     elif toggle == 'off':
-#         data['user_memory_preferences'][user_id] = False
-#         response_message = 'Memory has been turned off. Memory will not be cleared until you choose to clear it.'
-#     elif toggle == 'clear':
-#         data['user_conversation_memory'].pop(user_id, None)
-#         response_message = 'Memory has been cleared.'
-#     else:
-#         response_message = 'Invalid action.'
-
-#     update_data({
-#         'user_memory_preferences': data['user_memory_preferences'],
-#         'user_conversation_memory': data['user_conversation_memory'],
-#         'prem_users': prem_users
-#     })
-
-#     await ctx.respond(response_message)
-
-#     try:
-#         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-#     except Exception as e:
-#         print(f"{e}")
-
 # Set Style command
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
@@ -580,6 +534,38 @@ async def dere_clear(ctx: lightbulb.Context) -> None:
     except Exception as e:
         print(f"{e}")
 
+# Memory check command
+@bot.command()
+@lightbulb.command("memory_check", "Check how much memory is being used.")
+@lightbulb.implements(lightbulb.SlashCommand)
+async def memory_check(ctx: lightbulb.Context):
+    user_id = str(ctx.author.id)
+    data = load_data()
+    user_memory = data.get('user_conversation_memory', {}).get(user_id, [])
+    memory_limit = 30
+
+    if user_id in data.get('prem_users', {}):
+        await ctx.respond("You are a premium user. I can keep all our memories. ❤️")
+    else:
+        memory_used = len(user_memory) // 2
+        memory_percentage = (memory_used / memory_limit) * 100
+        await ctx.respond(f"You have used {memory_percentage}% of your available memory.")
+
+# Memory clear command
+@bot.command()
+@lightbulb.command("memory_clear", "Clear your memories with Aiko.")
+@lightbulb.implements(lightbulb.SlashCommand)
+async def memory_clear(ctx: lightbulb.Context):
+    user_id = str(ctx.author.id)
+    data = load_data()
+
+    if user_id in data.get('user_conversation_memory', {}):
+        del data['user_conversation_memory'][user_id]
+        save_data(data)
+        await ctx.respond("Your memories with me have been cleared but keep talking to me to make new make new memories :)")
+    else:
+        await ctx.respond("We haven't talked yet so I can't clear any memories.")
+
 # Misc----------------------------------------------------------------------------------------------------------------------------------------
 
 # Help command
@@ -600,11 +586,11 @@ async def help(ctx):
             "**Commands:**\n"
             "**/setchannel_toggle:** Restrict Aiko to particular channel(s).\n"
             "**/setchannel_view:** View channel(s) Aiko is restricted to.\n"
-            # "**/autorespond:** Have Aiko respond to every message in a set channel(s). (P)\n"
-            # "**/memory:** Make Aiko remember your conversations. (P)\n"
             "**/dere_set:** Set Aiko's personality.\n"
             "**/dere_view:** View Aiko's currently set personality.\n"
-            "**/dere_clear:** Clear Aiko's personality back to default.\n\n"
+            "**/dere_clear:** Clear Aiko's personality back to default.\n"
+            "**/memory_check:** Check how much memory is being used.\n"
+            "**/memory_clear:** Clear your memories with Aiko.\n\n"
             "**To use (P) premium commands and help cover costs associated with running Aiko, consider becoming a [supporter](https://ko-fi.com/aza3l/tiers) for  $1.99 a month. ❤️**\n\n"
         ),
         color=0x2B2D31
