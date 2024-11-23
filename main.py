@@ -22,7 +22,8 @@ def load_data():
             "user_conversation_memory": {},
             "user_custom_styles": {},
             "allowed_ai_channel_per_guild": {},
-            "autorespond_servers": {}
+            "autorespond_servers": {},
+            "user_custom_styles": {},
         }
 
 def save_data(data):
@@ -43,6 +44,7 @@ user_conversation_memory = data.get('user_conversation_memory', {})
 user_custom_styles = data.get('user_custom_styles', {})
 allowed_ai_channel_per_guild = data.get('allowed_ai_channel_per_guild', {})
 autorespond_servers = data.get('autorespond_servers', {})
+user_custom_styles = data.get('user_custom_styles', {})
 
 # Nonpersistent data
 prem_email = []
@@ -201,7 +203,7 @@ async def generate_text(prompt, user_id=None):
                     save_data({"limit_reached_flag": limit_reached_flag})
                     return (
                         f"You've almost reached your memory limit :( I'll now forget older messages as new memories with you are added. "
-                        "To continue without memory limits, consider becoming a [supporter](https://ko-fi.com/aza3l/tiers) for  $1.99 a month. ❤️"
+                        "To continue without memory limits, consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) for  $1.99 a month. ❤️"
                     )
                 user_memory = user_memory[-(memory_limit - 1):]
 
@@ -248,16 +250,13 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
     prem_users = data.get('prem_users', {})
 
     if isinstance(event, hikari.DMMessageCreateEvent):
-        # Handle Direct Messages
         if user_id not in prem_users:
-            # Respond to non-premium users in DMs
             await event.message.respond(
-                "I can only talk to supporters in DMs but you can talk to me in servers. "
-                "If you want to talk to me in DMs, consider becoming a [supporter](https://ko-fi.com/aza3l/tiers) for  $1.99 a month. ❤️"
+                "Sorry 🥲 I can only talk to supporters in DMs but you can talk to me in servers. "
+                "If you want to talk to me in DMs, consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) for  $1.99 a month. ❤️"
             )
             return
 
-        # Respond to premium users in DMs
         prompt = event.message.content.strip()
         async with bot.rest.trigger_typing(event.channel_id):
             response = await generate_text(prompt, user_id)
@@ -483,6 +482,10 @@ async def dere_set(ctx: lightbulb.Context) -> None:
         await ctx.command.cooldown_manager.reset_cooldown(ctx)
 
     data = load_data()
+
+    if 'user_custom_styles' not in data:
+        data['user_custom_styles'] = {}
+
     data['user_custom_styles'][user_id] = DERE_TYPES[selected_personality]
     save_data(data)
 
