@@ -20,10 +20,9 @@ def load_data():
             "prem_users": {},
             "user_memory_preferences": {},
             "user_conversation_memory": {},
-            "user_custom_styles": {},
             "allowed_ai_channel_per_guild": {},
-            "autorespond_servers": {},
             "user_custom_styles": {},
+            "limit_reached_flag": {},
         }
 
 def save_data(data):
@@ -37,17 +36,14 @@ def update_data(new_data):
 
 data = load_data()
 
-# Load data
 prem_users = data.get('prem_users', {})
 user_memory_preferences = data.get('user_memory_preferences', {})
 user_conversation_memory = data.get('user_conversation_memory', {})
-user_custom_styles = data.get('user_custom_styles', {})
 allowed_ai_channel_per_guild = data.get('allowed_ai_channel_per_guild', {})
-autorespond_servers = data.get('autorespond_servers', {})
 user_custom_styles = data.get('user_custom_styles', {})
+limit_reached_flag = data.get('limit_reached_flag', {})
 
-# Nonpersistent data
-prem_email = []
+prem_email = ['test03@gmail.com']
 user_reset_time = {}
 user_response_count = {}
 user_limit_reached = {}
@@ -117,7 +113,7 @@ topgg_client = TopGGClient(bot, topgg_token)
 # Presence
 @bot.listen(hikari.StartedEvent)
 async def on_starting(event: hikari.StartedEvent):
-    await topgg_client.setup()  # Initialize aiohttp.ClientSession
+    await topgg_client.setup()
     while True:
         guilds = await bot.rest.fetch_my_guilds()
         server_count = len(guilds)
@@ -127,22 +123,32 @@ async def on_starting(event: hikari.StartedEvent):
                 type=hikari.ActivityType.WATCHING,
             )
         )
-        await topgg_client.post_guild_count(server_count)  # Call the method here
+        await topgg_client.post_guild_count(server_count)
         await asyncio.sleep(3600)
 
 # Email
 @bot.listen(hikari.MessageCreateEvent)
 async def on_message(event: hikari.MessageCreateEvent) -> None:
-    if event.channel_id == 1285293925699031080:
-        email = event.message.content.strip()
+    message_content = event.message.content
+    if message_content is None:
+        return
+
+    message_content = message_content.strip() 
+
+    pattern = r'<@\d+>\s*(\S+@[\S]+\.[a-z]{2,6})'
+    match = re.match(pattern, message_content)
+
+    if match:
+        email = match.group(1)
+
         if re.match(r"[^@]+@[^@]+\.[^@]+", email):
             if email not in prem_email:
                 prem_email.append(email)
-                await bot.rest.create_message(1285303262127325301, f"prem_email = {prem_email}")
+                await bot.rest.create_message(1285303262127325301, f"Email `{email}` added to the list.")
             else:
-                await bot.rest.create_message(1285303262127325301, f"prem_email = {prem_email}")
+                await bot.rest.create_message(1285303262127325301, f"Email `{email}` is already in the list.")
         else:
-            await bot.rest.create_message(1285303262127325301, "The provided email is invalid.")
+            await bot.rest.create_message(1285303262127325301, "Invalid email format.")
 
 # Join event
 @bot.listen(hikari.GuildJoinEvent)
@@ -185,30 +191,37 @@ async def on_guild_leave(event):
 async def generate_text(prompt, user_id=None):
     try:
         data = load_data()
+
+        if "user_conversation_memory" not in data:
+            data["user_conversation_memory"] = {}
+
+        if user_id not in data["user_conversation_memory"]:
+            data["user_conversation_memory"][user_id] = []
+
+        if "limit_reached_flag" not in data:
+            data["limit_reached_flag"] = {}
+
         system_message = "Be a friendly anime waifu."
-        memory_limit = 20
+        memory_limit = 15
 
         is_premium = user_id in data.get('prem_users', {})
-        user_memory = data.get('user_conversation_memory', {}).get(user_id, [])
-        limit_reached_flag = data.get("limit_reached_flag", {})
 
-        if user_id and user_id in data.get('user_custom_styles', {}):
-            system_message = data['user_custom_styles'][user_id]
+        user_memory = data["user_conversation_memory"][user_id]
+        limit_reached_flag = data["limit_reached_flag"]
 
-        messages = [{"role": "system", "content": system_message}]
-        if user_id:
-            if not is_premium and len(user_memory) >= memory_limit:
+        if not is_premium:
+            if len(user_memory) >= memory_limit:
                 if not limit_reached_flag.get(user_id, False):
                     limit_reached_flag[user_id] = True
-                    save_data({"limit_reached_flag": limit_reached_flag})
+                    save_data(data)
                     return (
-                        f"You've almost reached your memory limit :( I'll now forget older messages as new memories with you are added. "
-                        "To continue without memory limits, consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) for  $1.99 a month. ❤️"
+                        "You've reached your memory limit 😢. I won't be able to remember older messages anymore but you can still talk to me like normal 😊. "
+                        "Consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) to unlock unlimited memory. ❤️"
                     )
                 user_memory = user_memory[-(memory_limit - 1):]
 
-            messages.extend(user_memory)
-
+        messages = [{"role": "system", "content": system_message}]
+        messages.extend(user_memory)
         messages.append({"role": "user", "content": prompt})
 
         response = await openai_client.chat.completions.create(
@@ -222,21 +235,15 @@ async def generate_text(prompt, user_id=None):
         )
 
         ai_response = response.choices[0].message.content.strip()
+        data["user_conversation_memory"][user_id].append({"role": "user", "content": prompt})
+        data["user_conversation_memory"][user_id].append({"role": "assistant", "content": ai_response})
 
-        if user_id:
-            if user_id not in data['user_conversation_memory']:
-                data['user_conversation_memory'][user_id] = []
-            data['user_conversation_memory'][user_id].append({"role": "user", "content": prompt})
-            data['user_conversation_memory'][user_id].append({"role": "assistant", "content": ai_response})
-
-            # Save trimmed memory back
-            if not is_premium and len(data['user_conversation_memory'][user_id]) > memory_limit * 2:
-                data['user_conversation_memory'][user_id] = data['user_conversation_memory'][user_id][-(memory_limit * 2):]
-
-            save_data(data)
+        save_data(data)
 
         return ai_response
+
     except Exception as e:
+        print(f"An error occurred in generate_text: {e}")
         return f"An error occurred: {str(e)}"
 
 # AI response message event listener
@@ -620,52 +627,40 @@ async def claim(ctx: lightbulb.Context) -> None:
     if user_id in data['prem_users']:
         await ctx.command.cooldown_manager.reset_cooldown(ctx)
         await ctx.respond("You already have premium. Thank you! ❤️")
-        try:
-            await bot.rest.create_message(1285303262127325301, f"`{ctx.author.id}` tried to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` but already had premium.")
-        except Exception as e:
-            print(f"{e}")
         return
-    
+
     email = ctx.options.email
-    
+
     if email in prem_email:
         if user_id not in data['prem_users']:
             data['prem_users'][user_id] = [server_id]
         else:
             if server_id not in data['prem_users'][user_id]:
                 data['prem_users'][user_id].append(server_id)
-        
+
         save_data(data)
         await ctx.respond("You have premium now! Thank you so much. ❤️")
-        
-        try:
-            await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-        except Exception as e:
-            print(f"{e}")
     else:
         embed = hikari.Embed(
-            title="Invite:",
+            title="🎁Premium🎁",
             description=(
                 "Your email was not recognized. If you think this is an error, join the [support server](https://discord.gg/dgwAC8TFWP) to fix this issue.\n\n"
                 "If you haven't yet subscribed, consider doing so for $1.99 a month. It keeps me online and you receive perks listed below. ❤️\n\n"
                 "Premium Perks:\n"
                 "**Access Premium Features Like:**\n"
-                "• Unlimited responses from me.\n"
-                "• I will repond to every message in set channel(s).\n"
-                "• Unlimited memory: I will never forget our conversations.\n"
-                "• Remove cool-downs.\n"
+                "• Unlimited responses from Aiko.\n"
+                "• Aiko can reply in DMs.\n"
+                "• Aiko will always remember your conversations..\n"
+                "• Remove cooldowns.\n"
                 "**Support Server Related Perks Like:**\n"
-                "• Access to behind the scenes discord channels.\n"
+                "• Access to behind-the-scenes Discord channels.\n"
                 "• Have a say in the development of Aiko.\n"
+                "• Supporter exclusive channels.\n\n"
                 "*Any memberships bought can be refunded within 3 days of purchase.*"
             ),
             color=0x2f3136
         )
         await ctx.respond(embed=embed)
-        try:
-            await bot.rest.create_message(1285303262127325301, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-        except Exception as e:
-            print(f"{e}")
 
 # Privacy Policy Command
 @bot.command
