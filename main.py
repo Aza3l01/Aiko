@@ -244,7 +244,7 @@ async def generate_text(prompt, user_id=None):
 
     except Exception as e:
         print(f"An error occurred in generate_text: {e}")
-        return f"An error occurred: {str(e)}"
+        return f"Oh no, can you send that message again 🥲"
 
 # AI response message event listener
 @bot.listen(hikari.MessageCreateEvent)
@@ -271,7 +271,6 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
         return
 
     elif isinstance(event, hikari.GuildMessageCreateEvent):
-        # Handle Guild Messages
         content = event.message.content or ""
         guild_id = str(event.guild_id)
         channel_id = str(event.channel_id)
@@ -593,7 +592,7 @@ async def help(ctx):
         description=(
             "Hello! I'm Aiko, your very own waifu chatbot! To talk to me, reply or ping me in channels. Use the /setchannel_toggle command to set channels for me to respond in.\n\n"
             "For suggestions and help, feel free to join the [support server](https://discord.gg/dgwAC8TFWP). My developer will be happy to help! [Click here](https://discord.com/oauth2/authorize?client_id=1285298352308621416), to invite me to your server.\n\n"
-            "Use the `/claim` command to receive your perks after becoming a supporter.\n\n"
+            "Use the `/claim` command to receive your perks after becoming a supporter. To learn more use the `/premium` command.\n\n"
             "**Commands:**\n"
             "**/setchannel_toggle:** Restrict Aiko to particular channel(s).\n"
             "**/setchannel_view:** View channel(s) Aiko is restricted to.\n"
@@ -602,7 +601,7 @@ async def help(ctx):
             "**/dere_clear:** Clear Aiko's personality back to default.\n"
             "**/memory_check:** Check how much memory is being used.\n"
             "**/memory_clear:** Clear your memories with Aiko.\n\n"
-            "**To use (P) premium commands and help cover costs associated with running Aiko, consider becoming a [supporter](https://ko-fi.com/aza3l/tiers) for  $1.99 a month. ❤️**\n\n"
+            "**To use premium features and help cover costs associated with running Aiko, consider becoming a [supporter](https://ko-fi.com/aza3l/tiers) for  $1.99 a month. ❤️**\n\n"
         ),
         color=0x2B2D31
     )
@@ -661,6 +660,38 @@ async def claim(ctx: lightbulb.Context) -> None:
             color=0x2f3136
         )
         await ctx.respond(embed=embed)
+
+# Premium Command
+@bot.command
+@lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
+@lightbulb.command("premium", "View Aiko's premium perks.")
+@lightbulb.implements(lightbulb.SlashCommand)
+async def premium(ctx: lightbulb.Context) -> None:
+    if any(word in str(ctx.author.id) for word in prem_users):
+        await ctx.command.cooldown_manager.reset_cooldown(ctx)
+    embed = hikari.Embed(
+        title="🎁Premium🎁",
+        description=(
+            "By [subscribing](https://ko-fi.com/aza3l/tiers) to premium for $1.99 a month, you keep me online and you receive perks listed below. ❤️\n\n"
+            "**Premium Features:**\n"
+            "• Unlimited responses from Aiko.\n"
+            "• Aiko can reply in DMs.\n"
+            "• Aiko will always remember your conversations..\n"
+            "• Remove cooldowns.\n"
+            "**Support Server Related Perks:**\n"
+            "• Access to behind-the-scenes Discord channels.\n"
+            "• Have a say in the development of Aiko.\n"
+            "• Supporter exclusive channels.\n\n"
+            "*Any memberships bought can be refunded within 3 days of purchase.*"
+        ),
+        color=0x2f3136
+    )
+    await ctx.respond(embed=embed)
+
+    try:
+        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+    except Exception as e:
+        print(f"Error logging privacy command: {e}")
 
 # Privacy Policy Command
 @bot.command
