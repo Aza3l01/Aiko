@@ -215,8 +215,8 @@ async def generate_text(prompt, user_id=None):
                     limit_reached_flag[user_id] = True
                     save_data(data)
                     return (
-                        "You've reached your memory limit 😢. I won't be able to remember older messages anymore but you can still talk to me like normal 😊. "
-                        "Consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) to unlock unlimited memory. ❤️"
+                        "You've reached your memory limit 🥲. I'll forget older messages when newer messages are created but you can still talk to me like normal. 😊 "
+                        "Consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) to unlock unlimited memory. It covers costs related to hosting and API requests and keeps me alive! ❤️"
                     )
                 user_memory = user_memory[-(memory_limit - 1):]
 
@@ -260,7 +260,7 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
         if user_id not in prem_users:
             await event.message.respond(
                 "Sorry 🥲 I can only talk to supporters in DMs but you can talk to me in servers. "
-                "If you want to talk to me in DMs, consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) for  $1.99 a month. ❤️"
+                "If you want to talk to me in DMs, consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) for  $1.99 a month. It keeps me alive! ❤️"
             )
             return
 
