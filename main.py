@@ -215,8 +215,7 @@ async def generate_text(prompt, user_id=None):
                     limit_reached_flag[user_id] = True
                     save_data(data)
                     return (
-                        "You've reached your memory limit 🥲. I'll forget older messages when newer messages are created but you can still talk to me like normal. 😊 "
-                        "Consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) to unlock unlimited memory. It covers costs related to hosting and API requests and keeps me alive! ❤️"
+                        "Oh no! Just a little heads up! 🥲 It seems I’ve reached my memory limit. This means I’ll have to forget some of our older messages as we keep chatting. But don’t worry, you can still talk to me just like normal! 😊 If you’d like to unlock unlimited memory (and other cool perks) and keep me around, consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) for just $1.99! Your support helps cover costs related to hosting, storage and API requests, and it keeps me alive! ❤️"
                     )
                 user_memory = user_memory[-(memory_limit - 1):]
 
@@ -259,8 +258,7 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
     if isinstance(event, hikari.DMMessageCreateEvent):
         if user_id not in prem_users:
             await event.message.respond(
-                "Sorry 🥲 I can only talk to supporters in DMs but you can talk to me in servers. "
-                "If you want to talk to me in DMs, consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) for  $1.99 a month. It keeps me alive! ❤️"
+                "I'm really sorry! 🥲 I can only chat with supporters in DMs, but you’re always welcome to talk to me in servers! If you'd like to chat in DMs, consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) for just $1.99!. Your support helps cover costs related to hosting, storage and API requests, and it keeps me alive! ❤️"
             )
             return
 
@@ -321,8 +319,7 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
                             title="Limit Reached :(",
                             description=(
                                 f"{event.message.author.mention}, limit resets in `6 hours`.\n\n"
-                                "If you want to continue for free, [vote](https://top.gg/bot/1285298352308621416/vote) to gain unlimited access for the next 12 hours "
-                                "or become a [supporter](https://ko-fi.com/aza3l/tiers) for $1.99 a month.\n\n"
+                                "If you want to continue talking to me, [vote](https://top.gg/bot/1285298352308621416/vote) to gain unlimited access for the next 12 hours or become a [supporter](https://ko-fi.com/aza3l/tiers) for $1.99 a month.\n\n"
                                 "I will never completely paywall my bot, but limits like this lower running costs and keep the bot running. ❤️"
                             ),
                             color=0x2B2D31
@@ -357,7 +354,7 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
                                 f"{event.message.author.mention}, limit resets in `6 hours`.\n\n"
                                 "If you want to continue for free, [vote](https://top.gg/bot/1285298352308621416/vote) to gain unlimited access for the next 12 hours "
                                 "or become a [supporter](https://ko-fi.com/aza3l/tiers) for $1.99 a month.\n\n"
-                                "I will never completely paywall my bot, but limits like this lower running costs and keep the bot running. ❤️"
+                                "I will never completely paywall all of Aiko's features but limits like this lower running costs related to hosting, storage and API requests while keeping Aiko alive. ❤️"
                             ),
                             color=0x2B2D31
                         )
@@ -399,7 +396,7 @@ async def setchannel(ctx):
     is_premium_user = str(ctx.author.id) in prem_users
 
     if not is_admin and not is_premium_user:
-        await ctx.respond("Sorry, this command is restricted to admins and supporters.")
+        await ctx.respond("Oops! This command is for admins only. If you want to change where I can talk, just ask an admin! 😅")
         try:
             await bot.rest.create_message(1285303262127325301, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
         except Exception as e:
@@ -474,7 +471,7 @@ async def viewsetchannels(ctx):
     except Exception as e:
         print(f"{e}")
 
-# Set Style command
+# Set dere command
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
 @lightbulb.option('personality', 'Choose a dere type for Aiko.', choices=list(DERE_TYPES.keys()), type=str)
@@ -495,14 +492,14 @@ async def dere_set(ctx: lightbulb.Context) -> None:
     data['user_custom_styles'][user_id] = DERE_TYPES[selected_personality]
     save_data(data)
 
-    await ctx.respond(f'Aiko\'s personality has been set to "{selected_personality.capitalize()}".')
+    await ctx.respond(f'My personality has been set to: “{selected_personality}".')
 
     try:
         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
         print(f"{e}")
 
-# View style command    
+# View dere command    
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
 @lightbulb.command('dere_view', 'View Aiko\'s current dere type personality.')
@@ -514,16 +511,16 @@ async def dere_view(ctx: lightbulb.Context) -> None:
     current_style = data.get('user_custom_styles', {}).get(user_id)
     if current_style:
         personality = next((key for key, value in DERE_TYPES.items() if value == current_style), "custom")
-        await ctx.respond(f'Aiko\'s current personality is set to: "{personality.capitalize()}".')
+        await ctx.respond(f'My current personality is set to: “{personality}".')
     else:
-        await ctx.respond("Aiko is currently using her default personality.")
+        await ctx.respond("I’m already using my default personality right now!")
 
     try:
         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
         print(f"{e}")
 
-# Clear style command
+# Clear dere command
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
 @lightbulb.command('dere_clear', 'Clear Aiko\'s dere type personality.')
@@ -535,9 +532,9 @@ async def dere_clear(ctx: lightbulb.Context) -> None:
     if user_id in data.get('user_custom_styles', {}):
         del data['user_custom_styles'][user_id]
         save_data(data)
-        await ctx.respond("Aiko's personality has been cleared to default.")
+        await ctx.respond("My personality has been reset to default. Let’s start fresh! 😊 What would you like to talk about?")
     else:
-        await ctx.respond("Aiko is already using her default personality.")
+        await ctx.respond("I’m already using my default personality right now!")
 
     try:
         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
@@ -555,11 +552,11 @@ async def memory_check(ctx: lightbulb.Context):
     memory_limit = 30
 
     if user_id in data.get('prem_users', {}):
-        await ctx.respond("You are a premium user. I can keep all our memories. ❤️")
+        await ctx.respond("You're a premium user! That means I can keep all our memories together. ❤️")
     else:
         memory_used = len(user_memory) // 2
         memory_percentage = (memory_used / memory_limit) * 100
-        await ctx.respond(f"You have used {memory_percentage}% of your available memory.")
+        await ctx.respond(f"You’ve used {memory_percentage}% of your available memory! Just a little heads up! 😊")
 
 # Memory clear command
 @bot.command()
@@ -572,9 +569,9 @@ async def memory_clear(ctx: lightbulb.Context):
     if user_id in data.get('user_conversation_memory', {}):
         del data['user_conversation_memory'][user_id]
         save_data(data)
-        await ctx.respond("Your memories with me have been cleared but keep talking to me to make new make new memories :)")
+        await ctx.respond("Your memories with me have been cleared, but don’t worry! Let’s keep chatting and make new memories together! 😊✨")
     else:
-        await ctx.respond("We haven't talked yet so I can't clear any memories.")
+        await ctx.respond("We haven’t had a chance to chat yet, so there aren’t any memories to clear! Let’s start our conversation and create some together! 😊💕.")
 
 # Misc----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -644,12 +641,12 @@ async def claim(ctx: lightbulb.Context) -> None:
             title="🎁Premium🎁",
             description=(
                 "Your email was not recognized. If you think this is an error, join the [support server](https://discord.gg/dgwAC8TFWP) to fix this issue.\n\n"
-                "If you haven't yet subscribed, consider doing so for $1.99 a month. It keeps me online and you receive perks listed below. ❤️\n\n"
+                "If you haven't yet [subscribed](https://ko-fi.com/aza3l/tiers), consider doing so for $1.99 a month. It keeps me online and you receive perks listed below. ❤️\n\n"
                 "Premium Perks:\n"
                 "**Access Premium Features Like:**\n"
                 "• Unlimited responses from Aiko.\n"
                 "• Aiko can reply in DMs.\n"
-                "• Aiko will always remember your conversations..\n"
+                "• Aiko will always remember your conversations.\n"
                 "• Remove cooldowns.\n"
                 "**Support Server Related Perks Like:**\n"
                 "• Access to behind-the-scenes Discord channels.\n"
@@ -672,11 +669,11 @@ async def premium(ctx: lightbulb.Context) -> None:
     embed = hikari.Embed(
         title="🎁Premium🎁",
         description=(
-            "By [subscribing](https://ko-fi.com/aza3l/tiers) to premium for $1.99 a month, you keep me online and you receive perks listed below. ❤️\n\n"
+            "A premium version of Aiko exists to cover costs related to hosting, storage and API requests. I will never paywall the main features of Aiko but these extra features exist to distribute some of the costs I would have to bear. By [subscribing](https://ko-fi.com/aza3l/tiers) to premium for $1.99 a month, you keep Aiko online and you receive perks listed below. ❤️\n\n"
             "**Premium Features:**\n"
             "• Unlimited responses from Aiko.\n"
             "• Aiko can reply in DMs.\n"
-            "• Aiko will always remember your conversations..\n"
+            "• Aiko will always remember your conversations.\n"
             "• Remove cooldowns.\n"
             "**Support Server Related Perks:**\n"
             "• Access to behind-the-scenes Discord channels.\n"
