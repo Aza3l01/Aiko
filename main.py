@@ -258,8 +258,12 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
     if isinstance(event, hikari.DMMessageCreateEvent):
         if user_id not in prem_users:
             await event.message.respond(
-                "I'm really sorry! 🥲 I can only chat with supporters in DMs, but you’re always welcome to talk to me in servers! If you'd like to chat in DMs, consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) for just $1.99!. Your support helps cover costs related to hosting, storage and API requests, and it keeps me alive! ❤️"
+                "I'm really sorry! 🥲 I can only chat with supporters in DMs, but you’re always welcome to talk to me in servers! Consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) for just $1.99! Your support helps cover costs related to hosting, storage and API requests, and it keeps me alive! ❤️"
             )
+            try:
+                await bot.rest.create_message(1285303262127325301, f"Failed to invoke `DMs` by `{user_id}`.")
+            except Exception as e:
+                print(f"Error while logging DM attempt: {e}")
             return
 
         prompt = event.message.content.strip()
