@@ -196,7 +196,7 @@ async def check_premium_users():
             email = details['email']
             claim_time = details['claim_time']
 
-            if current_time - claim_time >= 31 * 24 * 60 * 60:
+            if current_time - claim_time >= 30 * 24 * 60 * 60:
                 if email in prem_email:
                     updated_prem_users[user_id]["claim_time"] = current_time
                     prem_email.remove(email)
