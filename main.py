@@ -7,6 +7,7 @@ import re
 import json
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
+import time
 
 load_dotenv()
 DATA_FILE = 'data.json'
@@ -112,6 +113,7 @@ topgg_client = TopGGClient(bot, topgg_token)
 @bot.listen(hikari.StartedEvent)
 async def on_starting(event: hikari.StartedEvent):
     await topgg_client.setup()
+    asyncio.create_task(check_premium_users())
     while True:
         guilds = await bot.rest.fetch_my_guilds()
         server_count = len(guilds)
@@ -182,6 +184,30 @@ async def on_guild_leave(event):
     guild = event.old_guild
     if guild is not None:
         await bot.rest.create_message(1285303262127325301, f"Left `{guild.name}`.")
+
+# Premium check task
+async def check_premium_users():
+    while True:
+        data = load_data()
+        current_time = int(time.time())
+        updated_prem_users = data.get('prem_users', {})
+
+        for user_id, details in list(updated_prem_users.items()):
+            email = details['email']
+            claim_time = details['claim_time']
+
+            if current_time - claim_time >= 31 * 24 * 60 * 60:
+                if email in prem_email:
+                    updated_prem_users[user_id]["claim_time"] = current_time
+                    prem_email.remove(email)
+                    await bot.rest.create_message(1285303262127325301, f"`{email}` updated with new `claim_time`.")
+                else:
+                    updated_prem_users.pop(user_id)
+                    await bot.rest.create_message(1285303262127325301, f"`{email}` removed from `prem_users`.")
+
+        data['prem_users'] = updated_prem_users
+        save_data(data)
+        await asyncio.sleep(24 * 60 * 60)
 
 # Mechanism----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -620,22 +646,20 @@ async def help(ctx):
 async def claim(ctx: lightbulb.Context) -> None:
     data = load_data()
     user_id = str(ctx.author.id)
-    server_id = str(ctx.guild_id)
+    email = ctx.options.email
+    current_time = int(time.time())
 
     if user_id in data['prem_users']:
         await ctx.command.cooldown_manager.reset_cooldown(ctx)
         await ctx.respond("You already have premium. Thank you! ❤️")
         return
 
-    email = ctx.options.email
-
     if email in prem_email:
-        if user_id not in data['prem_users']:
-            data['prem_users'][user_id] = [server_id]
-        else:
-            if server_id not in data['prem_users'][user_id]:
-                data['prem_users'][user_id].append(server_id)
-
+        data['prem_users'][user_id] = {
+            "email": email,
+            "claim_time": current_time,
+        }
+        prem_email.remove(email)
         save_data(data)
         await ctx.respond("You have premium now! Thank you so much. ❤️")
     else:
@@ -644,13 +668,12 @@ async def claim(ctx: lightbulb.Context) -> None:
             description=(
                 "Your email was not recognized. If you think this is an error, join the [support server](https://discord.gg/dgwAC8TFWP) to fix this issue.\n\n"
                 "If you haven't yet [subscribed](https://ko-fi.com/aza3l/tiers), consider doing so for $1.99 a month. It keeps me online and you receive perks listed below. ❤️\n\n"
-                "Premium Perks:\n"
-                "**Access Premium Features Like:**\n"
+                "**Premium Perks:**\n"
                 "• Unlimited responses from Aiko.\n"
                 "• Aiko can reply in DMs.\n"
                 "• Aiko will always remember your conversations.\n"
                 "• Remove cooldowns.\n"
-                "**Support Server Related Perks Like:**\n"
+                "**Support Server Related Perks:**\n"
                 "• Access to behind-the-scenes Discord channels.\n"
                 "• Have a say in the development of Aiko.\n"
                 "• Supporter exclusive channels.\n\n"
