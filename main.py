@@ -652,6 +652,10 @@ async def claim(ctx: lightbulb.Context) -> None:
     if user_id in data['prem_users']:
         await ctx.command.cooldown_manager.reset_cooldown(ctx)
         await ctx.respond("You already have premium. Thank you! ❤️")
+        try:
+            await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+        except Exception as e:
+            print(f"{e}")
         return
 
     if email in prem_email:
@@ -662,6 +666,10 @@ async def claim(ctx: lightbulb.Context) -> None:
         prem_email.remove(email)
         save_data(data)
         await ctx.respond("You have premium now! Thank you so much. ❤️")
+        try:
+            await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+        except Exception as e:
+            print(f"{e}")
     else:
         embed = hikari.Embed(
             title="🎁Premium🎁",
@@ -682,6 +690,10 @@ async def claim(ctx: lightbulb.Context) -> None:
             color=0x2f3136
         )
         await ctx.respond(embed=embed)
+        try:
+            await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+        except Exception as e:
+            print(f"{e}")
 
 # Premium Command
 @bot.command
