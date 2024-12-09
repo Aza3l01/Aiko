@@ -18,13 +18,12 @@ def load_data():
     except (FileNotFoundError, json.JSONDecodeError):
         return {
             "prem_users": {},
-            "user_memory_preferences": {},
             "user_conversation_memory": {},
             "allowed_ai_channel_per_guild": {},
             "user_custom_styles": {},
             "limit_reached_flag": {},
         }
-
+ 
 def save_data(data):
     with open(DATA_FILE, 'w') as file:
         json.dump(data, file, indent=4)
@@ -37,7 +36,6 @@ def update_data(new_data):
 data = load_data()
 
 prem_users = data.get('prem_users', {})
-user_memory_preferences = data.get('user_memory_preferences', {})
 user_conversation_memory = data.get('user_conversation_memory', {})
 allowed_ai_channel_per_guild = data.get('allowed_ai_channel_per_guild', {})
 user_custom_styles = data.get('user_custom_styles', {})
