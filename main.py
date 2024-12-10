@@ -197,7 +197,7 @@ async def check_premium_users():
             email = details['email']
             claim_time = details['claim_time']
 
-            if current_time - claim_time >= 30 * 24 * 60 * 60:
+            if current_time - claim_time >= 31 * 24 * 60 * 60:
                 if email in prem_email:
                     updated_prem_users[user_id]["claim_time"] = current_time
                     prem_email.remove(email)
@@ -332,7 +332,7 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
             if allowed_channels and channel_id not in allowed_channels:
                 return
 
-            if current_time - reset_time > 21600:
+            if current_time - reset_time > 3600:
                 user_response_count[user_id] = 0
                 user_reset_time[user_id] = current_time
             else:
@@ -341,19 +341,10 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
                     user_reset_time[user_id] = current_time
 
             if user_id not in prem_users:
-                if user_response_count.get(user_id, 0) >= 20:
+                if user_response_count.get(user_id, 0) >= 30:
                     has_voted = await topgg_client.get_user_vote(user_id)
                     if not has_voted:
-                        embed = hikari.Embed(
-                            title="Limit Reached :(",
-                            description=(
-                                f"{event.message.author.mention}, limit resets in `6 hours`.\n\n"
-                                "If you want to continue talking to me, [vote](https://top.gg/bot/1285298352308621416/vote) to gain unlimited access for the next 12 hours or become a [supporter](https://ko-fi.com/aza3l/tiers) for $1.99 a month.\n\n"
-                                "I will never completely paywall my bot, but limits like this lower running costs and keep the bot running. ❤️"
-                            ),
-                            color=0x2B2D31
-                        )
-                        await event.message.respond(embed=embed)
+                        await event.message.respond("Oh no! 🥺 We’ve reached the limit of messages I can send, but this will reset in an hour. This exists because every message I read and reply to costs a certain amount of money for my developer. If you would like to continue without waiting, you can either vote on [top.gg](https://top.gg/bot/1285298352308621416/vote) for free or become a [supporter](https://ko-fi.com/aza3l/tiers)! Thank you! 💖")
                         user_limit_reached[user_id] = current_time
                         return
 
@@ -374,20 +365,10 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
                 return
 
             if user_id not in prem_users:
-                if user_response_count.get(user_id, 0) >= 20:
+                if user_response_count.get(user_id, 0) >= 30:
                     has_voted = await topgg_client.get_user_vote(user_id)
                     if not has_voted:
-                        embed = hikari.Embed(
-                            title="Limit Reached :(",
-                            description=(
-                                f"{event.message.author.mention}, limit resets in `6 hours`.\n\n"
-                                "If you want to continue for free, [vote](https://top.gg/bot/1285298352308621416/vote) to gain unlimited access for the next 12 hours "
-                                "or become a [supporter](https://ko-fi.com/aza3l/tiers) for $1.99 a month.\n\n"
-                                "I will never completely paywall all of Aiko's features but limits like this lower running costs related to hosting, storage and API requests while keeping Aiko alive. ❤️"
-                            ),
-                            color=0x2B2D31
-                        )
-                        await event.message.respond(embed=embed)
+                        await event.message.respond("Oh no! 🥺 We’ve reached the limit of messages I can send, but this will reset in an hour. This exists because every message I read and reply to costs a certain amount of money for my developer. If you would like to continue without waiting, you can either vote on [top.gg](https://top.gg/bot/1285298352308621416/vote) for free or become a [supporter](https://ko-fi.com/aza3l/tiers)! Thank you! 💖")
                         user_limit_reached[user_id] = current_time
                         return
 
@@ -618,7 +599,6 @@ async def help(ctx):
         description=(
             "Hello! I'm Aiko, your very own waifu chatbot! To talk to me, reply or ping me in channels. Use the /setchannel_toggle command to set channels for me to respond in.\n\n"
             "For suggestions and help, feel free to join the [support server](https://discord.gg/dgwAC8TFWP). My developer will be happy to help! [Click here](https://discord.com/oauth2/authorize?client_id=1285298352308621416), to invite me to your server.\n\n"
-            "Use the `/claim` command to receive your perks after becoming a supporter. To learn more use the `/premium` command.\n\n"
             "**Commands:**\n"
             "**/setchannel_toggle:** Restrict Aiko to particular channel(s).\n"
             "**/setchannel_view:** View channel(s) Aiko is restricted to.\n"
@@ -627,7 +607,8 @@ async def help(ctx):
             "**/dere_clear:** Clear Aiko's personality back to default.\n"
             "**/memory_check:** Check how much memory is being used.\n"
             "**/memory_clear:** Clear your memories with Aiko.\n\n"
-            "**To use premium features and help cover costs associated with running Aiko, consider becoming a [supporter](https://ko-fi.com/aza3l/tiers) for  $1.99 a month. ❤️**\n\n"
+            "Use the `/claim` command to receive your perks after becoming a supporter. To learn more use the `/premium` command."
+
         ),
         color=0x2B2D31
     )
@@ -681,7 +662,7 @@ async def claim(ctx: lightbulb.Context) -> None:
                 "• Unlimited responses from Aiko.\n"
                 "• Aiko can reply in DMs.\n"
                 "• Aiko will always remember your conversations.\n"
-                "• Remove cooldowns.\n"
+                "• Remove cooldowns.\n\n"
                 "**Support Server Related Perks:**\n"
                 "• Access to behind-the-scenes Discord channels.\n"
                 "• Have a say in the development of Aiko.\n"
@@ -712,7 +693,7 @@ async def premium(ctx: lightbulb.Context) -> None:
             "• Unlimited responses from Aiko.\n"
             "• Aiko can reply in DMs.\n"
             "• Aiko will always remember your conversations.\n"
-            "• Remove cooldowns.\n"
+            "• Remove cooldowns.\n\n"
             "**Support Server Related Perks:**\n"
             "• Access to behind-the-scenes Discord channels.\n"
             "• Have a say in the development of Aiko.\n"
