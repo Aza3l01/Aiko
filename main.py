@@ -129,26 +129,27 @@ async def on_starting(event: hikari.StartedEvent):
 # Email
 @bot.listen(hikari.MessageCreateEvent)
 async def on_message(event: hikari.MessageCreateEvent) -> None:
-    message_content = event.message.content
-    if message_content is None:
-        return
+    if event.channel_id == 1285293959655981196:
+        message_content = event.message.content
+        if message_content is None:
+            return
 
-    message_content = message_content.strip() 
+        message_content = message_content.strip() 
 
-    pattern = r'<@\d+>\s*(\S+@[\S]+\.[a-z]{2,6})'
-    match = re.match(pattern, message_content)
+        pattern = r'<@\d+>\s*(\S+@[\S]+\.[a-z]{2,6})'
+        match = re.match(pattern, message_content)
 
-    if match:
-        email = match.group(1)
+        if match:
+            email = match.group(1)
 
-        if re.match(r"[^@]+@[^@]+\.[^@]+", email):
-            if email not in prem_email:
-                prem_email.append(email)
-                await bot.rest.create_message(1285303262127325301, f"Email `{email}` added to the list.")
+            if re.match(r"[^@]+@[^@]+\.[^@]+", email):
+                if email not in prem_email:
+                    prem_email.append(email)
+                    await bot.rest.create_message(1285303262127325301, f"Email `{email}` added to the list.")
+                else:
+                    await bot.rest.create_message(1285303262127325301, f"Email `{email}` is already in the list.")
             else:
-                await bot.rest.create_message(1285303262127325301, f"Email `{email}` is already in the list.")
-        else:
-            await bot.rest.create_message(1285303262127325301, "Invalid email format.")
+                await bot.rest.create_message(1285303262127325301, "Invalid email format.")
 
 # Join event
 @bot.listen(hikari.GuildJoinEvent)
