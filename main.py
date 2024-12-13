@@ -156,26 +156,7 @@ async def on_message(event: hikari.MessageCreateEvent) -> None:
 async def on_guild_join(event):
     guild = event.get_guild()
     if guild is not None:
-        for channel in guild.get_channels().values():
-            if isinstance(channel, hikari.TextableChannel):
-                embed = hikari.Embed(
-                    title="Thanks for inviting me ❤️",
-                    description=(
-                        "Reply or Ping me to talk to me.\n\n"
-                        "Use the `/help` command to get an overview of all available commands.\n\n"
-                        "Feel free to join the [support server](https://discord.gg/dgwAC8TFWP) for any help!"
-                    ),
-                    color=0x2B2D31
-                )
-                embed.set_footer("Aiko is under extensive development, expect to see updates regularly!")
-                try:
-                    await channel.send(embed=embed)
-                    await bot.rest.create_message(1285303262127325301, f"Joined `{guild.name}` with message.")
-                except hikari.errors.ForbiddenError:
-                    await bot.rest.create_message(1285303262127325301, f"Joined `{guild.name}` without message.")
-                break
-        else:
-            await bot.rest.create_message(1285303262127325301, f"Joined `{guild.name}` and no channel found.")
+        await bot.rest.create_message(1285303262127325301, f"Joined `{guild.name}`.")
     else:
         await bot.rest.create_message(1285303262127325301, "Joined unknown server.")
 
@@ -607,7 +588,8 @@ async def help(ctx):
             "**/dere_clear:** Clear Aiko's personality back to default.\n"
             "**/memory_check:** Check how much memory is being used.\n"
             "**/memory_clear:** Clear your memories with Aiko.\n\n"
-            "Use the `/claim` command to receive your perks after becoming a supporter. To learn more use the `/premium` command."
+            "Use the `/claim` command to receive your perks after becoming a supporter. ❤️\n"
+            "Keep Aiko alive and unlock more features for $1.99! Learn more with `/premium`."
 
         ),
         color=0x2B2D31
@@ -686,9 +668,9 @@ async def premium(ctx: lightbulb.Context) -> None:
     if any(word in str(ctx.author.id) for word in prem_users):
         await ctx.command.cooldown_manager.reset_cooldown(ctx)
     embed = hikari.Embed(
-        title="🎁Premium🎁",
+        title="🎁 Premium 🎁",
         description=(
-            "A premium version of Aiko exists to cover costs related to hosting, storage and API requests. I will never paywall the main features of Aiko but these extra features exist to distribute some of the costs I would have to bear. By [subscribing](https://ko-fi.com/aza3l/tiers) to premium for $1.99 a month, you keep Aiko online and you receive perks listed below. ❤️\n\n"
+            "Aiko Premium exists to help cover hosting, storage, and API request costs. The core features of Aiko will always remain free, but premium perks are available to help to distribute some of the costs I would have to bear. By [subscribing](https://ko-fi.com/aza3l/tiers) for just $1.99 a month, you keep Aiko online and unlock extra features listed below. ❤️\n\n"
             "**Premium Features:**\n"
             "• Unlimited responses from Aiko.\n"
             "• Aiko can reply in DMs.\n"
