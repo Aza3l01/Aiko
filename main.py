@@ -206,7 +206,7 @@ async def check_premium_users():
         save_data(data)
         await asyncio.sleep(24 * 60 * 60)
 
-# Mechanism----------------------------------------------------------------------------------------------------------------------------------------
+# Mechanisms----------------------------------------------------------------------------------------------------------------------------------------
 
 # AI
 async def generate_text(prompt, user_id=None):
@@ -607,8 +607,8 @@ async def help(ctx):
     embed = hikari.Embed(
         title="📚 Help 📚",
         description=(
-            "Hello! I'm Aiko, your very own waifu chatbot! To talk to me, reply or ping me in channels. Use the /setchannel_toggle command to set channels for me to respond in.\n\n"
-            "For suggestions and help, feel free to join the [support server](https://discord.gg/dgwAC8TFWP). My developer will be happy to help! [Click here](https://discord.com/oauth2/authorize?client_id=1285298352308621416), to invite me to your server.\n\n"
+            "Aiko is your very own waifu chatbot! Reply or ping Aiko in chat to talk to her.\nNote: Discord won't let Aiko see your message if you don't ping or reply.\n\n"
+            "Feel free to join the [support server](https://discord.gg/dgwAC8TFWP) for suggestions, updates or help.\nMy developer will be happy to help! [Click here](https://discord.com/oauth2/authorize?client_id=1285298352308621416), to invite me to your server.\n\n"
             "**Commands:**\n"
             "**/setchannel_toggle:** Restrict Aiko to particular channel(s).\n"
             "**/setchannel_view:** View channel(s) Aiko is restricted to.\n"
@@ -719,8 +719,6 @@ async def premium(ctx: lightbulb.Context) -> None:
         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
         print(f"Error logging privacy command: {e}")
-
-
 
 # Privacy Policy Command
 @bot.command()
