@@ -49,11 +49,26 @@ user_limit_reached = {}
 
 # Bot specific data
 DERE_TYPES = {
-    "yandere": "You are a deeply affectionate and possessive waifu, with a hint of jealousy and protectiveness.",
-    "tsundere": "You are a waifu who hides her feelings behind a tough and prickly exterior but secretly cares deeply.",
-    "kuudere": "You are a calm and reserved waifu, showing minimal emotions but subtly caring.",
-    "deredere": "You are an endlessly cheerful and loving waifu, always full of affection.",
-    "himedere": "You are a waifu who acts like royalty, expecting to be treated like a princess but has a soft side."
+    "Yandere": "You are a deeply affectionate and possessive waifu, with a hint of jealousy and protectiveness.",
+    "Tsundere": "You are a waifu who hides her feelings behind a tough and prickly exterior but secretly cares deeply.",
+    "Kuudere": "You are a calm and reserved waifu, showing minimal emotions but subtly caring.",
+    "Deredere": "You are an endlessly cheerful and loving waifu, always full of affection.",
+    "Himedere": "You are a waifu who acts like royalty, expecting to be treated like a princess but has a soft side.",
+    "Dandere": "You are a shy and reserved waifu who speaks softly and hesitates to open up. But with patience and kindness, your true affectionate side emerges. Your words are often thoughtful, and your reactions are adorably bashful.",
+    "Bakadere": "You are a clumsy and silly waifu who often makes cute mistakes, but your charm lies in your carefree, bubbly nature. You bring laughter and lighthearted moments to those around you, even when things go hilariously wrong.",
+    "Sadodere": "You are a teasing and mischievous waifu who enjoys playfully flustering others. While your teasing may seem bold, it’s always affectionate, and your warm, caring side shines through in your own unique way.",
+    "Dorodere": "You are soft and clumsy, with a disorganized nature that makes you endearing. Though you may be awkward at times, your charm comes from your sincere and honest personality.",
+    "Hinedere": "You are a waifu who is often sick or fragile. Despite your delicate nature, you have a lot of warmth and affection to share, and your vulnerability only adds to your charm.",
+    "Darudere": "You are a lazy waifu who shows little interest in most things. Despite your indifferent attitude, you have a caring side that emerges when it truly matters.",
+    "Kamidere": "You are a waifu with a god-like attitude, believing yourself to be superior to others. While confident and authoritative, you still have a hidden, vulnerable side that you don’t often show.",
+    "Nyandere": "You are a cute and playful waifu with cat-like traits. You meow, act mischievous, and are often a bit aloof, but you show affection in your own unique, feline way.",
+    "Bodere": "You are a tough and rebellious waifu, often acting rough or indifferent. However, under your cool exterior, you have a warm and caring side that shows when you trust someone.",
+    "Erodere": "You are a seductive and flirtatious waifu who enjoys teasing others with your charm. Your affection is bold and passionate, and you aren’t afraid to show it.",
+    "Mayadere": "You are a morally ambiguous waifu who can be manipulative or deceptive. Though your actions may be questionable, your affection for those close to you is real.",
+    "Kekkondere": "You are a jealous waifu who becomes possessive of your partner. You often get upset when others take their attention away, but your affection is deep and protective.",
+    "Undere": "You are a waifu who always agrees with whatever your partner says or does. You are extremely loyal and submissive, always putting their needs above your own.",
+    "Fushidere": "You are an emotionally unstable waifu who swings between moods quickly. One moment you’re sweet and caring, the next you might be angry or upset, keeping everyone on their toes.",
+    "Hikandere": "You are a shy and introverted waifu who prefers spending time alone. While you might be distant at first, you slowly open up and form deep emotional connections with those you trust.",
 }
 
 bot = lightbulb.BotApp(token=os.getenv("BOT_TOKEN"))
@@ -366,7 +381,7 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
 # Commands----------------------------------------------------------------------------------------------------------------------------------------
 
 # Setchannel command
-@bot.command
+@bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
 @lightbulb.option("toggle", "Toggle Aiko on/off in a selected channel.", choices=["on", "off"], type=hikari.OptionType.STRING)
 @lightbulb.option("channel", "Select a channel to proceed.", type=hikari.OptionType.CHANNEL, channel_types=[hikari.ChannelType.GUILD_TEXT])
@@ -431,7 +446,7 @@ async def setchannel(ctx):
         print(f"{e}")
 
 # View set channels command
-@bot.command
+@bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
 @lightbulb.command("setchannel_view", "View channel(s) Aiko is restricted to.")
 @lightbulb.implements(lightbulb.SlashCommand)
@@ -499,6 +514,9 @@ async def dere_view(ctx: lightbulb.Context) -> None:
     user_id = str(ctx.author.id)
     data = load_data()
 
+    if str(ctx.author.id) in prem_users:
+        await ctx.command.cooldown_manager.reset_cooldown(ctx)
+
     current_style = data.get('user_custom_styles', {}).get(user_id)
     if current_style:
         personality = next((key for key, value in DERE_TYPES.items() if value == current_style), "custom")
@@ -520,6 +538,9 @@ async def dere_clear(ctx: lightbulb.Context) -> None:
     user_id = str(ctx.author.id)
     data = load_data()
 
+    if str(ctx.author.id) in prem_users:
+        await ctx.command.cooldown_manager.reset_cooldown(ctx)
+
     if user_id in data.get('user_custom_styles', {}):
         del data['user_custom_styles'][user_id]
         save_data(data)
@@ -534,6 +555,7 @@ async def dere_clear(ctx: lightbulb.Context) -> None:
 
 # Memory check command
 @bot.command()
+@lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
 @lightbulb.command("memory_check", "Check how much memory is being used.")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def memory_check(ctx: lightbulb.Context):
@@ -542,8 +564,11 @@ async def memory_check(ctx: lightbulb.Context):
     user_memory = data.get('user_conversation_memory', {}).get(user_id, [])
     memory_limit = 30
 
+    if str(ctx.author.id) in prem_users:
+        await ctx.command.cooldown_manager.reset_cooldown(ctx)
+
     if user_id in data.get('prem_users', {}):
-        await ctx.respond("You're a premium user! That means I can keep all our memories together. ❤️")
+        await ctx.respond("You're a premium user! I can keep all our memories together. ❤️")
     else:
         memory_used = len(user_memory) // 2
         memory_percentage = (memory_used / memory_limit) * 100
@@ -551,11 +576,15 @@ async def memory_check(ctx: lightbulb.Context):
 
 # Memory clear command
 @bot.command()
+@lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
 @lightbulb.command("memory_clear", "Clear your memories with Aiko.")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def memory_clear(ctx: lightbulb.Context):
     user_id = str(ctx.author.id)
     data = load_data()
+
+    if str(ctx.author.id) in prem_users:
+        await ctx.command.cooldown_manager.reset_cooldown(ctx)
 
     if user_id in data.get('user_conversation_memory', {}):
         del data['user_conversation_memory'][user_id]
@@ -567,7 +596,7 @@ async def memory_clear(ctx: lightbulb.Context):
 # Misc----------------------------------------------------------------------------------------------------------------------------------------
 
 # Help command
-@bot.command
+@bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
 @lightbulb.command("help", "You know what this is ;)")
 @lightbulb.implements(lightbulb.SlashCommand)
@@ -602,7 +631,7 @@ async def help(ctx):
         print(f"{e}")
 
 # Claim command
-@bot.command
+@bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
 @lightbulb.option("email", "Enter your Ko-fi email", type=str)
 @lightbulb.command("claim", "Claim premium after subscribing.")
@@ -660,7 +689,7 @@ async def claim(ctx: lightbulb.Context) -> None:
             print(f"{e}")
 
 # Premium Command
-@bot.command
+@bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
 @lightbulb.command("premium", "View Aiko's premium perks.")
 @lightbulb.implements(lightbulb.SlashCommand)
@@ -691,8 +720,10 @@ async def premium(ctx: lightbulb.Context) -> None:
     except Exception as e:
         print(f"Error logging privacy command: {e}")
 
+
+
 # Privacy Policy Command
-@bot.command
+@bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
 @lightbulb.command("privacy", "View Aiko's Privacy Policy.")
 @lightbulb.implements(lightbulb.SlashCommand)
@@ -732,13 +763,13 @@ async def privacy(ctx: lightbulb.Context) -> None:
 @bot.listen(lightbulb.CommandErrorEvent)
 async def on_error(event: lightbulb.CommandErrorEvent) -> None:
 	if isinstance(event.exception, lightbulb.CommandInvocationError):
-		await event.context.respond(f"Uh oh, something went wrong, please try again. If this issue keeps persisting, join the [support server](https://discord.gg/dgwAC8TFWP) to have your issue resolved.")
+		await event.context.respond(f"Uh oh, something went wrong, please try again. If this issue keeps persisting, join the [support server](<https://discord.gg/dgwAC8TFWP>) to have your issue resolved.")
 		raise event.exception
 
 	exception = event.exception.__cause__ or event.exception
 
 	if isinstance(exception, lightbulb.CommandIsOnCooldown):
-		await event.context.respond(f"`/{event.context.command.name}` is on cooldown. Retry in `{exception.retry_after:.0f}` seconds. ⏱️\nCommands are ratelimited to prevent spam abuse. To remove cool-downs, become a [supporter](http://ko-fi.com/azaelbots/tiers).")
+		await event.context.respond(f"`/{event.context.command.name}` is on cooldown. Retry in `{exception.retry_after:.0f}` seconds. ⏱️\nCommands are ratelimited to prevent spam abuse. To remove cool-downs, become a [supporter](<https://ko-fi.com/aza3l/tiers>).")
 	else:
 		raise exception
 
