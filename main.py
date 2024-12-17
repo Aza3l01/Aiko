@@ -221,7 +221,7 @@ async def generate_text(prompt, user_id=None):
             data["limit_reached_flag"] = {}
 
         system_message = "Be a friendly anime waifu."
-        memory_limit = 15
+        memory_limit = 25
 
         is_premium = user_id in data.get('prem_users', {})
 
@@ -234,7 +234,7 @@ async def generate_text(prompt, user_id=None):
                     limit_reached_flag[user_id] = True
                     save_data(data)
                     return (
-                        "Oh no! Just a little heads up! 🥲 It seems I’ve reached my memory limit. This means I’ll have to forget some of our older messages as we keep chatting. But don’t worry, you can still talk to me just like normal! 😊 If you’d like to unlock unlimited memory (and other cool perks) and keep me around, consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) for just $1.99! Your support helps cover costs related to hosting, storage and API requests, and it keeps me alive! ❤️"
+                        "Oh no! Just a little heads up! 🥲 It seems I’ve reached my memory limit. This means I’ll have to forget some of our older messages as we keep chatting. But don’t worry, you can still talk to me just like normal! 😊 If you’d like to unlock unlimited memory (and other cool perks) and keep me online, consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) for just $1.99! ❤️"
                     )
                 user_memory = user_memory[-(memory_limit - 1):]
 
@@ -335,7 +335,7 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
                     user_reset_time[user_id] = current_time
 
             if user_id not in prem_users:
-                if user_response_count.get(user_id, 0) >= 30:
+                if user_response_count.get(user_id, 0) >= 35:
                     has_voted = await topgg_client.get_user_vote(user_id)
                     if not has_voted:
                         await event.message.respond("Oh no! 🥺 We’ve reached the limit of messages I can send, but this will reset in an hour. This exists because every message I read and reply to costs a certain amount of money for my developer. If you would like to continue without waiting, you can either vote on [top.gg](https://top.gg/bot/1285298352308621416/vote) for free or become a [supporter](https://ko-fi.com/aza3l/tiers)! Thank you! 💖")
@@ -564,7 +564,7 @@ async def claim(ctx: lightbulb.Context) -> None:
             print(f"{e}")
     else:
         embed = hikari.Embed(
-            title="🎁Premium🎁",
+            title="🎁 Premium 🎁",
             description=(
                 "Your email was not recognized. If you think this is an error, join the [support server](https://discord.gg/dgwAC8TFWP) to fix this issue.\n\n"
                 "If you haven't yet [subscribed](https://ko-fi.com/aza3l/tiers), consider doing so for $1.99 a month. It keeps me online and you receive perks listed below. ❤️\n\n"
