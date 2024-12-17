@@ -20,7 +20,6 @@ def load_data():
         return {
             "prem_users": {},
             "user_conversation_memory": {},
-            "allowed_ai_channel_per_guild": {},
             "user_custom_styles": {},
             "limit_reached_flag": {},
         }
@@ -38,7 +37,6 @@ data = load_data()
 
 prem_users = data.get('prem_users', {})
 user_conversation_memory = data.get('user_conversation_memory', {})
-allowed_ai_channel_per_guild = data.get('allowed_ai_channel_per_guild', {})
 user_custom_styles = data.get('user_custom_styles', {})
 limit_reached_flag = data.get('limit_reached_flag', {})
 
@@ -380,103 +378,6 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
 
 # Commands----------------------------------------------------------------------------------------------------------------------------------------
 
-# Setchannel command
-@bot.command()
-@lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.option("toggle", "Toggle Aiko on/off in a selected channel.", choices=["on", "off"], type=hikari.OptionType.STRING)
-@lightbulb.option("channel", "Select a channel to proceed.", type=hikari.OptionType.CHANNEL, channel_types=[hikari.ChannelType.GUILD_TEXT])
-@lightbulb.command("setchannel_toggle", "Restrict Aiko to particular channel(s) for chatbot responses.")
-@lightbulb.implements(lightbulb.SlashCommand)
-async def setchannel(ctx):
-    data = load_data()
-    prem_users = data.get('prem_users', {})
-    allowed_ai_channel_per_guild = data.get('allowed_ai_channel_per_guild', {})
-    
-    if str(ctx.author.id) in prem_users:
-        await ctx.command.cooldown_manager.reset_cooldown(ctx)
-
-    guild_id = str(ctx.guild_id)
-
-    member = await ctx.bot.rest.fetch_member(ctx.guild_id, ctx.author.id)
-    is_admin = any(role.permissions & hikari.Permissions.ADMINISTRATOR for role in member.get_roles())
-    is_premium_user = str(ctx.author.id) in prem_users
-
-    if not is_admin and not is_premium_user:
-        await ctx.respond("Oops! This command is for admins only. If you want to change where I can talk, just ask an admin! 😅")
-        try:
-            await bot.rest.create_message(1285303262127325301, f"Failed to invoke `{ctx.command.name}` in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-        except Exception as e:
-            print(f"{e}")
-        return
-
-    if guild_id not in allowed_ai_channel_per_guild:
-        allowed_ai_channel_per_guild[guild_id] = []
-
-    toggle = ctx.options.toggle
-    channel_id = str(ctx.options.channel.id) if ctx.options.channel else None
-
-    if toggle == "on":
-        if channel_id and channel_id not in allowed_ai_channel_per_guild[guild_id]:
-            allowed_ai_channel_per_guild[guild_id].append(channel_id)
-            await ctx.respond(f"I will now only respond in <#{channel_id}>.")
-        elif channel_id in allowed_ai_channel_per_guild[guild_id]:
-            await ctx.respond(f"I am already set to respond in <#{channel_id}>.")
-        else:
-            await ctx.respond("Please specify a valid channel.")
-    elif toggle == "off":
-        if channel_id in allowed_ai_channel_per_guild[guild_id]:
-            allowed_ai_channel_per_guild[guild_id].remove(channel_id)
-            await ctx.respond(f"I am now not restricted to respond in <#{channel_id}>.")
-        else:
-            await ctx.respond("This channel is not currently restricted.")
-    else:
-        await ctx.respond("Invalid toggle. Use `/setchannel on <#channel>` or `/setchannel off <#channel>`.")
-
-    update_data({
-        'allowed_ai_channel_per_guild': allowed_ai_channel_per_guild
-    })
-
-    if str(ctx.author.id) in prem_users:
-        prem_users[str(ctx.author.id)] = guild_id
-        update_data({'prem_users': prem_users})
-
-    try:
-        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-    except Exception as e:
-        print(f"{e}")
-
-# View set channels command
-@bot.command()
-@lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.command("setchannel_view", "View channel(s) Aiko is restricted to.")
-@lightbulb.implements(lightbulb.SlashCommand)
-async def viewsetchannels(ctx):
-    data = load_data()
-    prem_users = data.get('prem_users', {})
-    allowed_ai_channel_per_guild = data.get('allowed_ai_channel_per_guild', {})
-    
-    if str(ctx.author.id) in prem_users:
-        await ctx.command.cooldown_manager.reset_cooldown(ctx)
-
-    guild_id = str(ctx.guild_id)
-    chatbot_channels = allowed_ai_channel_per_guild.get(guild_id, [])
-
-    chatbot_channel_list = "\n".join([f"<#{channel_id}>" for channel_id in chatbot_channels]) if chatbot_channels else "No channels set."
-
-    embed = hikari.Embed(
-        title="🔹 Channel Settings 🔹",
-        description=(
-            f"**Channels:**\n{chatbot_channel_list}"
-        ),
-        color=0x2B2D31
-    )
-    await ctx.respond(embed=embed)
-
-    try:
-        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-    except Exception as e:
-        print(f"{e}")
-
 # Set dere command
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
@@ -610,8 +511,6 @@ async def help(ctx):
             "Aiko is your very own waifu chatbot! Reply or ping Aiko in chat to talk to her.\nNote: Discord won't let Aiko see your message if you don't ping or reply.\n\n"
             "Feel free to join the [support server](https://discord.gg/dgwAC8TFWP) for suggestions, updates or help.\nMy developer will be happy to help! [Click here](https://discord.com/oauth2/authorize?client_id=1285298352308621416), to invite me to your server.\n\n"
             "**Commands:**\n"
-            "**/setchannel_toggle:** Restrict Aiko to particular channel(s).\n"
-            "**/setchannel_view:** View channel(s) Aiko is restricted to.\n"
             "**/dere_set:** Set Aiko's personality.\n"
             "**/dere_view:** View Aiko's currently set personality.\n"
             "**/dere_clear:** Clear Aiko's personality back to default.\n"
