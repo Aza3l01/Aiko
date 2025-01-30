@@ -529,6 +529,40 @@ async def help(ctx):
     except Exception as e:
         print(f"{e}")
 
+# Profile command
+@bot.command()
+@lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
+@lightbulb.command("profile", "View your profile.")
+@lightbulb.implements(lightbulb.SlashCommand)
+async def profile(ctx: lightbulb.Context):
+    user_id = str(ctx.author.id)
+    data = load_data()
+    user_memory = data.get('user_conversation_memory', {}).get(user_id, [])
+    memory_limit = 30
+    
+    is_premium = user_id in data.get('prem_users', {})
+    memory_used = len(user_memory) // 2
+    memory_percentage = round((memory_used / memory_limit) * 100) if not is_premium else "Unlimited"
+    
+    embed = hikari.Embed(
+        title=f"{ctx.author.username}'s Profile",
+        description=f"""
+        **Premium:** {'✅' if is_premium else '❌'}
+        **Memory Used:** {memory_percentage}%
+        
+        This page is incomplete. More features to be added soon!
+        """,
+        color=0x2B2D31
+    )
+    embed.set_thumbnail(ctx.author.avatar_url)
+    
+    await ctx.respond(embed=embed)
+
+    try:
+        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+    except Exception as e:
+        print(f"{e}")
+
 # Claim command
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
