@@ -15,30 +15,29 @@ DATA_FILE = 'data.json'
 def load_data():
     try:
         with open(DATA_FILE, 'r') as file:
-            return json.load(file)
+            data = json.load(file)
+            # Ensure the "users" key exists
+            if "users" not in data:
+                data["users"] = {}
+            return data
     except (FileNotFoundError, json.JSONDecodeError):
+        # New default structure
         return {
-            "prem_users": {},
-            "user_conversation_memory": {},
-            "user_custom_styles": {},
-            "limit_reached_flag": {},
+            "users": {}  # Ensure "users" key exists
         }
- 
+
 def save_data(data):
     with open(DATA_FILE, 'w') as file:
         json.dump(data, file, indent=4)
 
 def update_data(new_data):
     data = load_data()
-    data.update(new_data)
+    # Update only the "users" key if new_data contains user updates
+    if "users" in new_data:
+        data["users"].update(new_data["users"])
     save_data(data)
 
 data = load_data()
-
-prem_users = data.get('prem_users', {})
-user_conversation_memory = data.get('user_conversation_memory', {})
-user_custom_styles = data.get('user_custom_styles', {})
-limit_reached_flag = data.get('limit_reached_flag', {})
 
 prem_email = ['test03@gmail.com']
 user_reset_time = {}
@@ -185,24 +184,39 @@ async def check_premium_users():
     while True:
         data = load_data()
         current_time = int(time.time())
-        updated_prem_users = data.get('prem_users', {})
 
-        for user_id, details in list(updated_prem_users.items()):
-            email = details['email']
-            claim_time = details['claim_time']
+        for user_id, user_data in list(data["users"].items()):
+            if user_data["premium"] and user_data["email"] and user_data["claim_time"]:
+                if current_time - user_data["claim_time"] >= 31 * 24 * 60 * 60:
+                    if user_data["email"] in prem_email:
+                        user_data["claim_time"] = current_time
+                        prem_email.remove(user_data["email"])
+                        await bot.rest.create_message(1285303262127325301, f"`{user_data['email']}` renewed premium.")
+                    else:
+                        user_data["premium"] = False
+                        user_data["email"] = None
+                        user_data["claim_time"] = None
+                        await bot.rest.create_message(1285303262127325301, f"`{user_data['email']}` premium expired.")
 
-            if current_time - claim_time >= 31 * 24 * 60 * 60:
-                if email in prem_email:
-                    updated_prem_users[user_id]["claim_time"] = current_time
-                    prem_email.remove(email)
-                    await bot.rest.create_message(1285303262127325301, f"`{email}` updated with new `claim_time`.")
-                else:
-                    updated_prem_users.pop(user_id)
-                    await bot.rest.create_message(1285303262127325301, f"`{email}` removed from `prem_users`.")
-
-        data['prem_users'] = updated_prem_users
         save_data(data)
         await asyncio.sleep(24 * 60 * 60)
+
+# Create user
+def create_user(data, user_id):
+    """Create a new user entry in the data if it doesn't exist."""
+    if "users" not in data:
+        data["users"] = {}
+    if user_id not in data["users"]:
+        data["users"][user_id] = {
+            "premium": False,
+            "email": None,
+            "claim_time": None,
+            "style": None,
+            "limit_reached": False,
+            "memory": []
+        }
+        save_data(data)
+    return data["users"][user_id]
 
 # Mechanisms----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -210,31 +224,22 @@ async def check_premium_users():
 async def generate_text(prompt, user_id=None):
     try:
         data = load_data()
-
-        if "user_conversation_memory" not in data:
-            data["user_conversation_memory"] = {}
-
-        if user_id not in data["user_conversation_memory"]:
-            data["user_conversation_memory"][user_id] = []
-
-        if "limit_reached_flag" not in data:
-            data["limit_reached_flag"] = {}
+        user_data = create_user(data, user_id)
 
         system_message = "Be a friendly anime waifu."
         memory_limit = 25
 
-        is_premium = user_id in data.get('prem_users', {})
-
-        user_memory = data["user_conversation_memory"][user_id]
-        limit_reached_flag = data["limit_reached_flag"]
+        is_premium = user_data["premium"]
+        user_memory = user_data["memory"]
+        limit_reached = user_data["limit_reached"]
 
         if not is_premium:
             if len(user_memory) >= memory_limit:
-                if not limit_reached_flag.get(user_id, False):
-                    limit_reached_flag[user_id] = True
+                if not limit_reached:
+                    user_data["limit_reached"] = True
                     save_data(data)
                     return (
-                        "Oh no! Just a little heads up! 🥲 It seems I’ve reached my memory limit. This means I’ll have to forget some of our older messages as we keep chatting. But don’t worry, you can still talk to me just like normal! 😊 If you’d like to unlock unlimited memory (and other cool perks) and keep me online, consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) for just $1.99! ❤️"
+                        "Oh no! Just a little heads up! 🥲 It seems I’ve reached my memory limit..."
                     )
                 user_memory = user_memory[-(memory_limit - 1):]
 
@@ -253,16 +258,16 @@ async def generate_text(prompt, user_id=None):
         )
 
         ai_response = response.choices[0].message.content.strip()
-        data["user_conversation_memory"][user_id].append({"role": "user", "content": prompt})
-        data["user_conversation_memory"][user_id].append({"role": "assistant", "content": ai_response})
 
+        user_data["memory"].append({"role": "user", "content": prompt})
+        user_data["memory"].append({"role": "assistant", "content": ai_response})
         save_data(data)
 
         return ai_response
 
     except Exception as e:
         print(f"An error occurred in generate_text: {e}")
-        return f"Oh no, can you send that message again 🥲"
+        return "Oh no, can you send that message again 🥲"
 
 # AI response message event listener
 @bot.listen(hikari.MessageCreateEvent)
@@ -272,60 +277,37 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
 
     user_id = str(event.message.author.id)
     data = load_data()
-    prem_users = data.get('prem_users', {})
 
-    if isinstance(event, hikari.DMMessageCreateEvent):
-        if user_id not in prem_users:
-            await event.message.respond(
-                "I'm really sorry! 🥲 I can only chat with supporters in DMs, but you’re always welcome to talk to me in servers! Consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) for just $1.99! Your support helps cover costs related to hosting, storage and API requests, and it keeps me alive! ❤️"
-            )
+    content = event.message.content or ""
+    guild_id = str(event.guild_id)
+    channel_id = str(event.channel_id)
+    current_time = asyncio.get_event_loop().time()
+    reset_time = user_reset_time.get(user_id, 0)
+    bot_id = bot.get_me().id
+    bot_mention = f"<@{bot_id}>"
+    mentions_bot = bot_mention in content
+    references_message = event.message.message_reference is not None
+
+    if references_message:
+        referenced_message_id = event.message.message_reference.id
+        if referenced_message_id:
             try:
-                await bot.rest.create_message(1285303262127325301, f"Failed to invoke `DMs` by `{user_id}`.")
-            except Exception as e:
-                print(f"Error while logging DM attempt: {e}")
-            return
-
-        prompt = event.message.content.strip()
-        async with bot.rest.trigger_typing(event.channel_id):
-            response = await generate_text(prompt, user_id)
-        await event.message.respond(response)
-        return
-
-    elif isinstance(event, hikari.GuildMessageCreateEvent):
-        content = event.message.content or ""
-        guild_id = str(event.guild_id)
-        channel_id = str(event.channel_id)
-        current_time = asyncio.get_event_loop().time()
-        reset_time = user_reset_time.get(user_id, 0)
-        bot_id = bot.get_me().id
-        bot_mention = f"<@{bot_id}>"
-        mentions_bot = bot_mention in content
-        references_message = event.message.message_reference is not None
-
-        if references_message:
-            referenced_message_id = event.message.message_reference.id
-            if referenced_message_id:
-                try:
-                    referenced_message = await bot.rest.fetch_message(event.channel_id, referenced_message_id)
-                    is_reference_to_bot = referenced_message.author.id == bot_id
-                except (hikari.errors.ForbiddenError, hikari.errors.NotFoundError):
-                    is_reference_to_bot = False
-                except hikari.errors.BadRequestError as e:
-                    print(f"BadRequestError: {e}")
-                    is_reference_to_bot = False
-            else:
+                referenced_message = await bot.rest.fetch_message(event.channel_id, referenced_message_id)
+                is_reference_to_bot = referenced_message.author.id == bot_id
+            except (hikari.errors.ForbiddenError, hikari.errors.NotFoundError):
+                is_reference_to_bot = False
+            except hikari.errors.BadRequestError as e:
+                print(f"BadRequestError: {e}")
                 is_reference_to_bot = False
         else:
             is_reference_to_bot = False
+    else:
+        is_reference_to_bot = False
 
-        autorespond_servers = data.get('autorespond_servers', {})
-        allowed_ai_channel_per_guild = data.get('allowed_ai_channel_per_guild', {})
+    if mentions_bot or is_reference_to_bot:
+        user_data = create_user(data, user_id)
 
-        if autorespond_servers.get(guild_id):
-            allowed_channels = allowed_ai_channel_per_guild.get(guild_id, [])
-            if allowed_channels and channel_id not in allowed_channels:
-                return
-
+        if not user_data["premium"]:
             if current_time - reset_time > 3600:
                 user_response_count[user_id] = 0
                 user_reset_time[user_id] = current_time
@@ -334,146 +316,51 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
                     user_response_count[user_id] = 0
                     user_reset_time[user_id] = current_time
 
-            if user_id not in prem_users:
-                if user_response_count.get(user_id, 0) >= 35:
-                    has_voted = await topgg_client.get_user_vote(user_id)
-                    if not has_voted:
-                        await event.message.respond("Oh no! 🥺 We’ve reached the limit of messages I can send, but this will reset in an hour. This exists because every message I read and reply to costs a certain amount of money for my developer. If you would like to continue without waiting, you can either vote on [top.gg](https://top.gg/bot/1285298352308621416/vote) for free or become a [supporter](https://ko-fi.com/aza3l/tiers)! Thank you! 💖")
-                        user_limit_reached[user_id] = current_time
-                        return
+            if user_response_count.get(user_id, 0) >= 30:
+                has_voted = await topgg_client.get_user_vote(user_id)
+                if not has_voted:
+                    await event.message.respond("Oh no! 🥺 We’ve reached the limit of messages I can send, but this will reset in an hour. This exists because every message I read and reply to costs a certain amount of money for my developer. If you would like to continue without waiting, you can either vote on [top.gg](https://top.gg/bot/1285298352308621416/vote) for free or become a [supporter](https://ko-fi.com/aza3l/tiers)! Thank you! 💖")
+                    user_limit_reached[user_id] = current_time
+                    return
 
-            async with bot.rest.trigger_typing(channel_id):
-                ai_response = await generate_text(content, user_id)
+        async with bot.rest.trigger_typing(channel_id):
+            ai_response = await generate_text(content, user_id)
 
-            user_response_count[user_id] = user_response_count.get(user_id, 0) + 1
-            response_message = f"{event.message.author.mention} {ai_response}"
-            try:
-                await event.message.respond(response_message)
-            except hikari.errors.ForbiddenError:
-                pass
-            return
-
-        if mentions_bot or is_reference_to_bot:
-            allowed_channels = allowed_ai_channel_per_guild.get(guild_id, [])
-            if allowed_channels and channel_id not in allowed_channels:
-                return
-
-            if user_id not in prem_users:
-                if user_response_count.get(user_id, 0) >= 30:
-                    has_voted = await topgg_client.get_user_vote(user_id)
-                    if not has_voted:
-                        await event.message.respond("Oh no! 🥺 We’ve reached the limit of messages I can send, but this will reset in an hour. This exists because every message I read and reply to costs a certain amount of money for my developer. If you would like to continue without waiting, you can either vote on [top.gg](https://top.gg/bot/1285298352308621416/vote) for free or become a [supporter](https://ko-fi.com/aza3l/tiers)! Thank you! 💖")
-                        user_limit_reached[user_id] = current_time
-                        return
-
-            async with bot.rest.trigger_typing(channel_id):
-                ai_response = await generate_text(content, user_id)
-
-            user_response_count[user_id] = user_response_count.get(user_id, 0) + 1
-            response_message = f"{event.message.author.mention} {ai_response}"
-            try:
-                await event.message.respond(response_message)
-            except hikari.errors.ForbiddenError:
-                pass
+        user_response_count[user_id] = user_response_count.get(user_id, 0) + 1
+        response_message = f"{event.message.author.mention} {ai_response}"
+        try:
+            await event.message.respond(response_message)
+        except hikari.errors.ForbiddenError:
+            pass
 
 # Commands----------------------------------------------------------------------------------------------------------------------------------------
 
 # Set dere command
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.option('personality', 'Choose a dere type for Aiko.', choices=list(DERE_TYPES.keys()), type=str)
+@lightbulb.option('personality', 'Choose a dere type for Aiko.', choices=["Default"] + list(DERE_TYPES.keys()), type=str)
 @lightbulb.command('dere_set', 'Set Aiko\'s dere type personality.')
 @lightbulb.implements(lightbulb.SlashCommand)
 async def dere_set(ctx: lightbulb.Context) -> None:
     user_id = str(ctx.author.id)
     selected_personality = ctx.options.personality
 
-    if user_id in prem_users:
-        await ctx.command.cooldown_manager.reset_cooldown(ctx)
-
     data = load_data()
+    user_data = create_user(data, user_id)
 
-    if 'user_custom_styles' not in data:
-        data['user_custom_styles'] = {}
-
-    data['user_custom_styles'][user_id] = DERE_TYPES[selected_personality]
-    save_data(data)
-
-    await ctx.respond(f'My personality has been set to: “{selected_personality}".')
-
-    try:
-        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-    except Exception as e:
-        print(f"{e}")
-
-# View dere command    
-@bot.command()
-@lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.command('dere_view', 'View Aiko\'s current dere type personality.')
-@lightbulb.implements(lightbulb.SlashCommand)
-async def dere_view(ctx: lightbulb.Context) -> None:
-    user_id = str(ctx.author.id)
-    data = load_data()
-
-    if str(ctx.author.id) in prem_users:
-        await ctx.command.cooldown_manager.reset_cooldown(ctx)
-
-    current_style = data.get('user_custom_styles', {}).get(user_id)
-    if current_style:
-        personality = next((key for key, value in DERE_TYPES.items() if value == current_style), "custom")
-        await ctx.respond(f'My current personality is set to: “{personality}".')
-    else:
-        await ctx.respond("I’m already using my default personality right now!")
-
-    try:
-        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-    except Exception as e:
-        print(f"{e}")
-
-# Clear dere command
-@bot.command()
-@lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.command('dere_clear', 'Clear Aiko\'s dere type personality.')
-@lightbulb.implements(lightbulb.SlashCommand)
-async def dere_clear(ctx: lightbulb.Context) -> None:
-    user_id = str(ctx.author.id)
-    data = load_data()
-
-    if str(ctx.author.id) in prem_users:
-        await ctx.command.cooldown_manager.reset_cooldown(ctx)
-
-    if user_id in data.get('user_custom_styles', {}):
-        del data['user_custom_styles'][user_id]
+    if selected_personality == "Default":
+        user_data["style"] = None
         save_data(data)
         await ctx.respond("My personality has been reset to default. Let’s start fresh! 😊 What would you like to talk about?")
     else:
-        await ctx.respond("I’m already using my default personality right now!")
+        user_data["style"] = DERE_TYPES[selected_personality]
+        save_data(data)
+        await ctx.respond(f'My personality has been set to: “{selected_personality}".')
 
     try:
         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
         print(f"{e}")
-
-# Memory check command
-@bot.command()
-@lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.command("memory_check", "Check how much memory is being used.")
-@lightbulb.implements(lightbulb.SlashCommand)
-async def memory_check(ctx: lightbulb.Context):
-    user_id = str(ctx.author.id)
-    data = load_data()
-    user_memory = data.get('user_conversation_memory', {}).get(user_id, [])
-    memory_limit = 30
-
-    if str(ctx.author.id) in prem_users:
-        await ctx.command.cooldown_manager.reset_cooldown(ctx)
-
-    if user_id in data.get('prem_users', {}):
-        await ctx.respond("You're a premium user! I can keep all our memories together. ❤️")
-    else:
-        memory_used = len(user_memory) // 2
-        memory_percentage = (memory_used / memory_limit) * 100
-        await ctx.respond(f"You’ve used {memory_percentage}% of your available memory! Just a little heads up! 😊")
 
 # Memory clear command
 @bot.command()
@@ -483,16 +370,19 @@ async def memory_check(ctx: lightbulb.Context):
 async def memory_clear(ctx: lightbulb.Context):
     user_id = str(ctx.author.id)
     data = load_data()
+    user_data = create_user(data, user_id)
 
-    if str(ctx.author.id) in prem_users:
-        await ctx.command.cooldown_manager.reset_cooldown(ctx)
-
-    if user_id in data.get('user_conversation_memory', {}):
-        del data['user_conversation_memory'][user_id]
+    if user_data["memory"]:
+        user_data["memory"] = []
         save_data(data)
         await ctx.respond("Your memories with me have been cleared, but don’t worry! Let’s keep chatting and make new memories together! 😊✨")
     else:
         await ctx.respond("We haven’t had a chance to chat yet, so there aren’t any memories to clear! Let’s start our conversation and create some together! 😊💕.")
+
+    try:
+        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+    except Exception as e:
+        print(f"{e}")
 
 # Misc----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -502,7 +392,11 @@ async def memory_clear(ctx: lightbulb.Context):
 @lightbulb.command("help", "You know what this is ;)")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def help(ctx):
-    if any(word in str(ctx.author.id) for word in prem_users):
+    user_id = str(ctx.author.id)
+    data = load_data()
+    user_data = create_user(data, user_id)
+
+    if user_data["premium"]:
         await ctx.command.cooldown_manager.reset_cooldown(ctx)
 
     embed = hikari.Embed(
@@ -511,14 +405,11 @@ async def help(ctx):
             "Aiko is your very own waifu chatbot! Reply or ping Aiko in chat to talk to her.\nNote: Discord won't let Aiko see your message if you don't ping or reply.\n\n"
             "Feel free to join the [support server](https://discord.gg/dgwAC8TFWP) for suggestions, updates or help.\nMy developer will be happy to help! [Click here](https://discord.com/oauth2/authorize?client_id=1285298352308621416), to invite me to your server.\n\n"
             "**Commands:**\n"
+            "**/profile:** View your profile.\n"
             "**/dere_set:** Set Aiko's personality.\n"
-            "**/dere_view:** View Aiko's currently set personality.\n"
-            "**/dere_clear:** Clear Aiko's personality back to default.\n"
-            "**/memory_check:** Check how much memory is being used.\n"
             "**/memory_clear:** Clear your memories with Aiko.\n\n"
             "Use the `/claim` command to receive your perks after becoming a supporter. ❤️\n"
             "Keep Aiko alive and unlock more features for $1.99! Learn more with `/premium`."
-
         ),
         color=0x2B2D31
     )
@@ -537,31 +428,35 @@ async def help(ctx):
 async def profile(ctx: lightbulb.Context):
     user_id = str(ctx.author.id)
     data = load_data()
-    user_memory = data.get('user_conversation_memory', {}).get(user_id, [])
+
+    user_data = create_user(data, user_id)
+
+    dere_type = "Default"
+    if user_data["style"]:
+        dere_type = next((k for k, v in DERE_TYPES.items() if v == user_data["style"]), "Custom")
+
     memory_limit = 30
-    
-    is_premium = user_id in data.get('prem_users', {})
-    memory_used = len(user_memory) // 2
-    memory_percentage = round((memory_used / memory_limit) * 100) if not is_premium else "Unlimited"
-    
+    memory_used = len(user_data["memory"]) // 2
+    memory_percentage = round((memory_used / memory_limit) * 100) if not user_data["premium"] else "Unlimited"
+    memory_status = f"{memory_percentage}%" if isinstance(memory_percentage, int) else "Unlimited"
+
     embed = hikari.Embed(
-        title=f"{ctx.author.username}'s Profile",
-        description=f"""
-        **Premium:** {'✅' if is_premium else '❌'}
-        **Memory Used:** {memory_percentage}%
-        
-        This page is incomplete. More features to be added soon!
-        """,
         color=0x2B2D31
     )
-    embed.set_thumbnail(ctx.author.avatar_url)
-    
+    embed.set_author(name=f"{ctx.author.username}'s Profile", icon=ctx.author.avatar_url)  
+    embed.add_field(name="Premium Status", value=f'{"✅ Active" if user_data["premium"] else "❌ Not Active"}', inline=True)
+    embed.add_field(name="Memory Usage", value=memory_status, inline=True)
+    embed.add_field(name="Dere Type", value=dere_type, inline=True)
+
+    if user_data["premium"]:
+        await ctx.command.cooldown_manager.reset_cooldown(ctx)
+
     await ctx.respond(embed=embed)
 
     try:
         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
-        print(f"{e}")
+        print(f"Error logging profile command: {e}")
 
 # Claim command
 @bot.command()
@@ -572,10 +467,12 @@ async def profile(ctx: lightbulb.Context):
 async def claim(ctx: lightbulb.Context) -> None:
     data = load_data()
     user_id = str(ctx.author.id)
+    user_data = create_user(data, user_id)
+
     email = ctx.options.email
     current_time = int(time.time())
 
-    if user_id in data['prem_users']:
+    if user_data["premium"]:
         await ctx.command.cooldown_manager.reset_cooldown(ctx)
         await ctx.respond("You already have premium. Thank you! ❤️")
         try:
@@ -585,10 +482,9 @@ async def claim(ctx: lightbulb.Context) -> None:
         return
 
     if email in prem_email:
-        data['prem_users'][user_id] = {
-            "email": email,
-            "claim_time": current_time,
-        }
+        user_data["premium"] = True
+        user_data["email"] = email
+        user_data["claim_time"] = current_time
         prem_email.remove(email)
         save_data(data)
         await ctx.respond("You have premium now! Thank you so much. ❤️")
@@ -627,8 +523,13 @@ async def claim(ctx: lightbulb.Context) -> None:
 @lightbulb.command("premium", "View Aiko's premium perks.")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def premium(ctx: lightbulb.Context) -> None:
-    if any(word in str(ctx.author.id) for word in prem_users):
+    user_id = str(ctx.author.id)
+    data = load_data()
+    user_data = create_user(data, user_id)
+
+    if user_data["premium"]:
         await ctx.command.cooldown_manager.reset_cooldown(ctx)
+
     embed = hikari.Embed(
         title="🎁 Premium 🎁",
         description=(
@@ -651,7 +552,7 @@ async def premium(ctx: lightbulb.Context) -> None:
     try:
         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
-        print(f"Error logging privacy command: {e}")
+        print(f"Error logging premium command: {e}")
 
 # Privacy Policy Command
 @bot.command()
@@ -659,13 +560,18 @@ async def premium(ctx: lightbulb.Context) -> None:
 @lightbulb.command("privacy", "View Aiko's Privacy Policy.")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def privacy(ctx: lightbulb.Context) -> None:
-    if any(word in str(ctx.author.id) for word in prem_users):
+    user_id = str(ctx.author.id)
+    data = load_data()
+    user_data = create_user(data, user_id)
+
+    if user_data["premium"]:
         await ctx.command.cooldown_manager.reset_cooldown(ctx)
+
     embed = hikari.Embed(
         title="Privacy Policy for Aiko.",
         description=(
             "**Last Updated:** 13/11/2024 (DD/MM/YYYY)\n\n"
-            "Aiko (\"the Bot\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use the Bot. By using the Bot, you agree to the terms of this Privacy Policy.\n\n"            
+            "Aiko (\"the Bot\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use the Bot. By using the Bot, you agree to the terms of this Privacy Policy.\n\n"
             "__**Data Collection**__\n"
             "**User Information:** We do not collect or store any personal information about users. For premium users, the Bot stores memory preferences and user-defined response styles locally.\n"
             "**Usage Data:** We collect and store data on the usage of commands for analytical purposes. This data is anonymized and does not contain any personal information.\n\n"
