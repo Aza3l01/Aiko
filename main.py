@@ -239,7 +239,7 @@ async def generate_text(prompt, user_id=None):
                     user_data["limit_reached"] = True
                     save_data(data)
                     return (
-                        "Oh no! Just a little heads up! 🥲 It seems I’ve reached my memory limit..."
+                        "Oh no! Just a little heads up! 🥲 It seems I’ve reached my memory limit. This means I’ll have to forget some of our older messages as we keep chatting. But don’t worry, you can still talk to me just like normal! 😊 If you’d like to unlock unlimited memory (and other cool perks) and keep me around, consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) for just $1.99! Your support helps cover costs related to hosting, storage and API requests, and it keeps me alive! ❤️"
                     )
                 user_memory = user_memory[-(memory_limit - 1):]
 
@@ -270,14 +270,12 @@ async def generate_text(prompt, user_id=None):
         return "Oh no, can you send that message again 🥲"
 
 # AI response message event listener
-@bot.listen(hikari.MessageCreateEvent)
 async def on_ai_message(event: hikari.MessageCreateEvent):
     if event.message.author.is_bot:
         return
 
     user_id = str(event.message.author.id)
     data = load_data()
-
     content = event.message.content or ""
     guild_id = str(event.guild_id)
     channel_id = str(event.channel_id)
@@ -306,8 +304,10 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
 
     if mentions_bot or is_reference_to_bot:
         user_data = create_user(data, user_id)
+        is_premium = user_data["premium"]
+        is_dm = guild_id == "None"
 
-        if not user_data["premium"]:
+        if not is_premium and is_dm:
             if current_time - reset_time > 3600:
                 user_response_count[user_id] = 0
                 user_reset_time[user_id] = current_time
@@ -319,7 +319,7 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
             if user_response_count.get(user_id, 0) >= 30:
                 has_voted = await topgg_client.get_user_vote(user_id)
                 if not has_voted:
-                    await event.message.respond("Oh no! 🥺 We’ve reached the limit of messages I can send, but this will reset in an hour. This exists because every message I read and reply to costs a certain amount of money for my developer. If you would like to continue without waiting, you can either vote on [top.gg](https://top.gg/bot/1285298352308621416/vote) for free or become a [supporter](https://ko-fi.com/aza3l/tiers)! Thank you! 💖")
+                    await event.message.respond("Oh no! 🥺 We’ve reached the limit of messages I can send in DMs, but this will reset in an hour. If you want to continue, you can vote on [top.gg](https://top.gg/bot/1285298352308621416/vote) for free or become a [supporter](https://ko-fi.com/aza3l/tiers). Your support helps cover costs related to hosting, storage and API requests, and keeps me alive! ❤️")
                     user_limit_reached[user_id] = current_time
                     return
 
