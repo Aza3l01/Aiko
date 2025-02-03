@@ -217,7 +217,7 @@ def create_user(data, user_id):
             "points": 0,
             "streak": 0,
             "last_interaction": None,
-            "mood": 50,
+            "mood": 20,
             "memory": []
         }
         save_data(data)
@@ -232,7 +232,7 @@ async def generate_text(prompt, user_id=None):
         user_data = create_user(data, user_id)
 
         system_message = "Be a friendly anime waifu."
-        memory_limit = 25
+        memory_limit = 50
 
         is_premium = user_data["premium"]
         user_memory = user_data["memory"]
@@ -347,7 +347,7 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
             if user_response_count.get(user_id, 0) >= 30:
                 has_voted = await topgg_client.get_user_vote(user_id)
                 if not has_voted:
-                    await event.message.respond("Oh no! 🥺 We’ve reached the limit of messages I can send in DMs...")
+                    await event.message.respond("Oh no! 🥺 We’ve reached the limit of messages I can send, but this will reset in an hour. This exists because every message I read and reply to costs a certain amount of money for my developer. If you would like to continue without waiting, you can either vote on [top.gg](https://top.gg/bot/1285298352308621416/vote) for free or become a [supporter](https://ko-fi.com/aza3l/tiers)! Thank you! 💖")
                     user_limit_reached[user_id] = current_time
                     return
                 else:
@@ -567,15 +567,33 @@ async def help(ctx):
         title="📚 Help 📚",
         description=(
             "**__Talking to Aiko__**\n"
-            "Aiko is your very own waifu chatbot! Reply or ping Aiko in chat to talk to her. View all your stats by using the `/profile` command. To reset Aiko's memory, use the `/memory_clear` command.\nNote: Discord won't let Aiko see your message if you don't ping or reply.\n\n"
+            "- **Reply** or **ping** Aiko in chat to talk to her.\n"
+            "- Use the `/profile` command to view all your stats.\n"
+            "- Use the `/memory_clear` command to reset Aiko's memory.\n"
+            "> *Note*: Discord won't let Aiko see your message if you don't ping or reply.\n\n"
+            
             "**__Affection System__**\n"
-            "Earn points by talking to Aiko daily and maintaining your streak. Each day the streak is maintained, you'll earn gift points which you can use by using the `/gift` command to increase Aiko's mood. If streaks are not maintained Aiko's mood will slowly decline.\n\n"
+            "- Earn points by talking to Aiko daily and maintaining your streak.\n"
+            "- Each day the streak is maintained, you'll earn gift points.\n"
+            "- You can earn additional gift points by [voting](https://top.gg/bot/1285298352308621416/vote).\n"
+            "- Use the `/gift` command to spend gift points and increase Aiko's mood.\n"
+            "> *Note*: If streaks are not maintained, Aiko's mood will slowly decline.\n\n"
+            
             "**__Dere Types__**\n"
-            "Aiko comes with 20+ personalities. Use the `/dere_set` command to configure her personality.\n\n"
+            "- Aiko comes with **20+ personalities**.\n"
+            "- Use the `/dere_set` command to configure her personality.\n\n"
+            
             "**__Premium__**\n"
-            "Premium exists to help cover hosting, storage, and API request costs. The core features of Aiko will always remain free, but premium perks are available to help to distribute some of the costs I would have to bear. By [subscribing](https://ko-fi.com/aza3l/tiers) for just $1.99 a month, you keep Aiko online and unlock extra features like 2x boost on points earned, unlimited text (in DMs), unlimited memory, and addtional support server perks like exclusive behind-the-scenes channels. Use the `/claim` command to receive your perks after becoming a supporter.❤️\n\n"
+            "- Premium helps cover hosting, storage, and API request costs.\n"
+            "- Premium features of Aiko can be used for free by [voting](https://top.gg/bot/1285298352308621416/vote).\n"
+            "- By [supporting](https://ko-fi.com/aza3l/tiers) for just **$1.99/month**, you:\n"
+            "  - Unlock **2x boost** on points earned.\n"
+            "  - Get **unlimited text** (in DMs) and **unlimited memory**.\n"
+            "  - Access exclusive **support server perks** like behind-the-scenes channels.\n"
+            "- Use the `/claim` command to receive your perks after becoming a supporter.\n\n"
+            
             "**__Troubleshooting and Suggestions__**\n"
-            "Feel free to join the [support server](https://discord.gg/dgwAC8TFWP) for suggestions, updates or help.\nMy developer will be happy to help! [Click here](https://discord.com/oauth2/authorize?client_id=1285298352308621416), to invite me to your server.\n\n"
+            "Join the [support server](https://discord.gg/dgwAC8TFWP) for help, suggestions, or updates. My developer will be happy to assist you! [Click here](https://discord.com/oauth2/authorize?client_id=1285298352308621416) to invite Aiko to your server.\n\n"
         ),
         color=0x2B2D31
     )
@@ -689,8 +707,9 @@ async def claim(ctx: lightbulb.Context) -> None:
                 "Your email was not recognized. If you think this is an error, join the [support server](https://discord.gg/dgwAC8TFWP) to fix this issue.\n\n"
                 "If you haven't yet [subscribed](https://ko-fi.com/aza3l/tiers), consider doing so for $1.99 a month. It keeps me online and you receive perks listed below. ❤️\n\n"
                 "**Premium Perks:**\n"
+                "• 2x Daily Gift Points boost.\n"
                 "• Unlimited responses from Aiko.\n"
-                "• Aiko can reply in DMs.\n"
+                "• Unlimited responses in DMs.\n"
                 "• Aiko will always remember your conversations.\n"
                 "• Remove cooldowns.\n\n"
                 "**Support Server Related Perks:**\n"
