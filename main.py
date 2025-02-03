@@ -96,21 +96,40 @@ class TopGGClient:
                 print("Posted server count to Top.gg")
 
     async def get_user_vote(self, user_id):
-        """Check if a user has voted for the bot on Top.gg."""
+        """Check if a user has voted for the bot on Top.gg and automatically reward them."""
         if not self.session:
             raise RuntimeError("Client session is not initialized. Call setup() first.")
+
         url = f"https://top.gg/api/bots/{self.bot.get_me().id}/check?userId={user_id}"
         headers = {"Authorization": self.token}
+
         try:
             async with self.session.get(url, headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
-                    return data.get('voted') == 1
+                    
+                    if data.get('voted') == 1:  # User has voted
+                        # Load data properly
+                        all_data = load_data()
+                        user_id_str = str(user_id)
+                        
+                        # Ensure user exists
+                        user_data = create_user(all_data, user_id_str)
+                        
+                        # Add 50 points
+                        user_data["points"] += 50  
+
+                        # Save the updated data back
+                        all_data["users"][user_id_str] = user_data  
+                        save_data(all_data)  
+
+                        print(f"✅ User {user_id_str} voted and received 50 points! New balance: {user_data['points']}")
+                        return True
                 else:
-                    print(f"Failed to check user vote: {response.status}")
+                    print(f"❌ Failed to check user vote: {response.status}")
                     return False
         except Exception as e:
-            print(f"An error occurred while checking user vote: {e}")
+            print(f"⚠️ Error while checking user vote: {e}")
             return False
 
     async def close(self):
@@ -283,7 +302,10 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
     user_id = str(event.message.author.id)
     data = load_data()
     content = event.message.content or ""
-    guild_id = str(event.guild_id)
+
+    guild_id = str(event.guild_id) if hasattr(event, 'guild_id') else None  # Fix: Handle DMs
+    is_dm = guild_id is None  # Fix: Check if it's a DM
+
     channel_id = str(event.channel_id)
     current_time = time.time()
     bot_id = bot.get_me().id
@@ -301,41 +323,29 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
     else:
         is_reference_to_bot = False
 
-    if mentions_bot or is_reference_to_bot:
+    if mentions_bot or is_reference_to_bot or is_dm:  # Fix: Allow DMs to trigger AI response
         user_data = create_user(data, user_id)
         is_premium = user_data["premium"]
-        is_dm = guild_id == "None"
 
         # Update interaction and streaks
         last_interaction = user_data.get("last_interaction")
         
         if last_interaction:
-            # Calculate time since last interaction
             time_diff = current_time - last_interaction
-            
-            # Check if interaction is in new calendar day (24-48 hour window)
             if 86400 <= time_diff < 172800:
                 user_data["streak"] += 1
-                
-                # Calculate points (10 base + 10 per streak day)
                 points_to_add = 10 + (10 * user_data["streak"])
                 if is_premium:
                     points_to_add *= 2
-                
                 user_data["points"] += points_to_add
-                
-                # Update mood (2% per 10 points)
-                mood_increase = (points_to_add // 10) * 2
-                user_data["mood"] = min(100, user_data["mood"] + mood_increase)
-                
-        # Update last interaction time
+
         user_data["last_interaction"] = current_time
         save_data(data)
 
-        # DM rate limiting check
-        if not is_premium and is_dm:
+        # DM rate limiting check for non-premium users
+        if is_dm and not is_premium:
             reset_time = user_reset_time.get(user_id, 0)
-            
+
             if current_time - reset_time > 3600:
                 user_response_count[user_id] = 0
                 user_reset_time[user_id] = current_time
@@ -347,23 +357,23 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
             if user_response_count.get(user_id, 0) >= 30:
                 has_voted = await topgg_client.get_user_vote(user_id)
                 if not has_voted:
-                    await event.message.respond("Oh no! 🥺 We’ve reached the limit of messages I can send, but this will reset in an hour. This exists because every message I read and reply to costs a certain amount of money for my developer. If you would like to continue without waiting, you can either vote on [top.gg](https://top.gg/bot/1285298352308621416/vote) for free or become a [supporter](https://ko-fi.com/aza3l/tiers)! Thank you! 💖")
+                    await event.message.respond("Oh no! 🥺 We’ve reached the limit of messages I can send in DMs, but this will reset in an hour. If you would like to continue without waiting, you can either vote on [top.gg](https://top.gg/bot/1285298352308621416/vote) for free or become a [supporter](https://ko-fi.com/aza3l/tiers)! Thank you! 💖")
                     user_limit_reached[user_id] = current_time
                     return
                 else:
-                    # Award voting points
                     user_data["points"] += 10
                     if is_premium:
                         user_data["points"] += 10
                     user_data["mood"] = min(100, user_data["mood"] + 2)
                     save_data(data)
 
-        # Generate and send response
+        # Generate AI response
         async with bot.rest.trigger_typing(channel_id):
             ai_response = await generate_text(content, user_id)
 
         user_response_count[user_id] = user_response_count.get(user_id, 0) + 1
         response_message = f"{event.message.author.mention} {ai_response}"
+        
         try:
             await event.message.respond(response_message)
         except hikari.errors.ForbiddenError:
@@ -442,7 +452,7 @@ async def memory_clear(ctx: lightbulb.Context):
 
 # Leaderboard
 @bot.command()
-@lightbulb.command("top", "View the leaderboard")
+@lightbulb.command("top", "View the leaderboard", auto_defer=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def leaderboard(ctx):
     data = load_data()
