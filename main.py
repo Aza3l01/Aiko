@@ -126,6 +126,7 @@ topgg_client = TopGGClient(bot, topgg_token)
 async def on_starting(event: hikari.StartedEvent):
     await topgg_client.setup()
     asyncio.create_task(check_premium_users())
+    asyncio.create_task(daily_maintenance())
     while True:
         guilds = await bot.rest.fetch_my_guilds()
         server_count = len(guilds)
@@ -213,6 +214,10 @@ def create_user(data, user_id):
             "claim_time": None,
             "style": None,
             "limit_reached": False,
+            "points": 0,
+            "streak": 0,
+            "last_interaction": None,
+            "mood": 50,
             "memory": []
         }
         save_data(data)
@@ -270,6 +275,7 @@ async def generate_text(prompt, user_id=None):
         return "Oh no, can you send that message again 🥲"
 
 # AI response message event listener
+@bot.listen(hikari.MessageCreateEvent)
 async def on_ai_message(event: hikari.MessageCreateEvent):
     if event.message.author.is_bot:
         return
@@ -279,25 +285,18 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
     content = event.message.content or ""
     guild_id = str(event.guild_id)
     channel_id = str(event.channel_id)
-    current_time = asyncio.get_event_loop().time()
-    reset_time = user_reset_time.get(user_id, 0)
+    current_time = time.time()
     bot_id = bot.get_me().id
     bot_mention = f"<@{bot_id}>"
     mentions_bot = bot_mention in content
     references_message = event.message.message_reference is not None
 
+    # Check if message references bot
     if references_message:
-        referenced_message_id = event.message.message_reference.id
-        if referenced_message_id:
-            try:
-                referenced_message = await bot.rest.fetch_message(event.channel_id, referenced_message_id)
-                is_reference_to_bot = referenced_message.author.id == bot_id
-            except (hikari.errors.ForbiddenError, hikari.errors.NotFoundError):
-                is_reference_to_bot = False
-            except hikari.errors.BadRequestError as e:
-                print(f"BadRequestError: {e}")
-                is_reference_to_bot = False
-        else:
+        try:
+            referenced_message = await bot.rest.fetch_message(event.channel_id, event.message.message_reference.id)
+            is_reference_to_bot = referenced_message.author.id == bot_id
+        except (hikari.errors.ForbiddenError, hikari.errors.NotFoundError, hikari.errors.BadRequestError):
             is_reference_to_bot = False
     else:
         is_reference_to_bot = False
@@ -307,7 +306,36 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
         is_premium = user_data["premium"]
         is_dm = guild_id == "None"
 
+        # Update interaction and streaks
+        last_interaction = user_data.get("last_interaction")
+        
+        if last_interaction:
+            # Calculate time since last interaction
+            time_diff = current_time - last_interaction
+            
+            # Check if interaction is in new calendar day (24-48 hour window)
+            if 86400 <= time_diff < 172800:
+                user_data["streak"] += 1
+                
+                # Calculate points (10 base + 10 per streak day)
+                points_to_add = 10 + (10 * user_data["streak"])
+                if is_premium:
+                    points_to_add *= 2
+                
+                user_data["points"] += points_to_add
+                
+                # Update mood (2% per 10 points)
+                mood_increase = (points_to_add // 10) * 2
+                user_data["mood"] = min(100, user_data["mood"] + mood_increase)
+                
+        # Update last interaction time
+        user_data["last_interaction"] = current_time
+        save_data(data)
+
+        # DM rate limiting check
         if not is_premium and is_dm:
+            reset_time = user_reset_time.get(user_id, 0)
+            
             if current_time - reset_time > 3600:
                 user_response_count[user_id] = 0
                 user_reset_time[user_id] = current_time
@@ -319,10 +347,18 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
             if user_response_count.get(user_id, 0) >= 30:
                 has_voted = await topgg_client.get_user_vote(user_id)
                 if not has_voted:
-                    await event.message.respond("Oh no! 🥺 We’ve reached the limit of messages I can send in DMs, but this will reset in an hour. If you want to continue, you can vote on [top.gg](https://top.gg/bot/1285298352308621416/vote) for free or become a [supporter](https://ko-fi.com/aza3l/tiers). Your support helps cover costs related to hosting, storage and API requests, and keeps me alive! ❤️")
+                    await event.message.respond("Oh no! 🥺 We’ve reached the limit of messages I can send in DMs...")
                     user_limit_reached[user_id] = current_time
                     return
+                else:
+                    # Award voting points
+                    user_data["points"] += 10
+                    if is_premium:
+                        user_data["points"] += 10
+                    user_data["mood"] = min(100, user_data["mood"] + 2)
+                    save_data(data)
 
+        # Generate and send response
         async with bot.rest.trigger_typing(channel_id):
             ai_response = await generate_text(content, user_id)
 
@@ -332,6 +368,26 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
             await event.message.respond(response_message)
         except hikari.errors.ForbiddenError:
             pass
+
+# Daily checks
+async def daily_maintenance():
+    while True:
+        data = load_data()
+        current_time = time.time()
+        
+        for user_id, user_data in data["users"].items():
+            # Mood decay
+            if user_data["last_interaction"]:
+                days_since = (current_time - user_data["last_interaction"]) // 86400
+                if days_since > 0:
+                    # Decay mood by 5% per day
+                    user_data["mood"] = max(0, user_data["mood"] - 5 * days_since)
+                    # Reset streak if more than 1 day since last interaction
+                    if days_since > 1:
+                        user_data["streak"] = 0
+        
+        save_data(data)
+        await asyncio.sleep(86400)  # 24 hours
 
 # Commands----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -384,6 +440,114 @@ async def memory_clear(ctx: lightbulb.Context):
     except Exception as e:
         print(f"{e}")
 
+# Leaderboard
+@bot.command()
+@lightbulb.command("top", "View the leaderboard")
+@lightbulb.implements(lightbulb.SlashCommand)
+async def leaderboard(ctx):
+    data = load_data()
+    current_user_id = str(ctx.author.id)
+    
+    # Ensure all users are properly initialized and get sorted list
+    all_users = []
+    for user_id in data["users"]:
+        user_data = create_user(data, user_id)
+        user_data["user_id"] = user_id  # Ensure user_id exists in data
+        all_users.append(user_data)
+    
+    # Sort by points descending
+    sorted_users = sorted(all_users, key=lambda x: x["points"], reverse=True)
+    
+    # Prepare top 10 entries
+    top_10 = sorted_users[:10]
+    
+    # Find current user's rank and data
+    current_user_rank = None
+    current_user_data = None
+    for index, user in enumerate(sorted_users):
+        if user["user_id"] == current_user_id:
+            current_user_rank = index + 1
+            current_user_data = user
+            break
+
+    # Create embed
+    embed = hikari.Embed(title="🏆 Leaderboard 🏆", color=0x2B2D31)
+    
+    # Build top 10 list
+    top_list = []
+    for idx, user in enumerate(top_10, 1):
+        try:
+            user_obj = await bot.rest.fetch_user(int(user["user_id"]))
+            username = user_obj.username
+        except (hikari.errors.NotFoundError, KeyError):
+            username = "Unknown User"
+        
+        entry = (
+            f"`#{idx}` {username}\n"
+            f"Points: {user['points']} • "
+            f"Streak: {user['streak']}"
+        )
+        top_list.append(entry)
+
+    # Add top 10 to embed
+    embed.add_field(
+        name="Top 10 Users",
+        value="\n\n".join(top_list) if top_list else "No users yet!",
+        inline=False
+    )
+
+    # Add current user's position
+    if current_user_data and current_user_rank:
+        user_position = (
+            f"`#{idx}` You\n"
+            f"Points: {user['points']} • "
+            f"Streak: {user['streak']}"
+        )
+        
+        embed.add_field(
+            name="\u200b",
+            value=user_position,
+            inline=False
+        )
+    embed.set_footer("This page is not complete! Aiko is new and under extensive development.\nFeel free to visit the support server to learn more.")
+    await ctx.respond(embed=embed)
+
+# Gift command
+@bot.command()
+@lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
+@lightbulb.command("gift", "Spend 10 points to increase Aiko's mood by 2%.")
+@lightbulb.implements(lightbulb.SlashCommand)
+async def gift(ctx: lightbulb.Context) -> None:
+    user_id = str(ctx.author.id)
+    data = load_data()
+    user_data = create_user(data, user_id)
+
+    cost = 10
+    mood_increase = 2
+
+    # Reset cooldown for premium users
+    if user_data["premium"]:
+        await ctx.command.cooldown_manager.reset_cooldown(ctx)
+
+    # Check if user has enough points
+    if user_data["points"] < cost:
+        await ctx.respond(f"You need at least {cost} points to use this command. You currently have {user_data['points']} points. ❌")
+        return
+
+    # Deduct points and increase mood
+    user_data["points"] -= cost
+    user_data["mood"] = min(100, user_data["mood"] + mood_increase)
+    save_data(data)
+
+    # Send confirmation
+    await ctx.respond(f"🎁 You spent {cost} points to increase Aiko's mood by {mood_increase}%! Her mood is now {user_data['mood']}%! 💖")
+
+    # Log command usage
+    try:
+        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+    except Exception as e:
+        print(f"Error logging gift command: {e}")
+
 # Misc----------------------------------------------------------------------------------------------------------------------------------------
 
 # Help command
@@ -402,14 +566,16 @@ async def help(ctx):
     embed = hikari.Embed(
         title="📚 Help 📚",
         description=(
-            "Aiko is your very own waifu chatbot! Reply or ping Aiko in chat to talk to her.\nNote: Discord won't let Aiko see your message if you don't ping or reply.\n\n"
+            "**__Talking to Aiko__**\n"
+            "Aiko is your very own waifu chatbot! Reply or ping Aiko in chat to talk to her. View all your stats by using the `/profile` command. To reset Aiko's memory, use the `/memory_clear` command.\nNote: Discord won't let Aiko see your message if you don't ping or reply.\n\n"
+            "**__Affection System__**\n"
+            "Earn points by talking to Aiko daily and maintaining your streak. Each day the streak is maintained, you'll earn gift points which you can use by using the `/gift` command to increase Aiko's mood. If streaks are not maintained Aiko's mood will slowly decline.\n\n"
+            "**__Dere Types__**\n"
+            "Aiko comes with 20+ personalities. Use the `/dere_set` command to configure her personality.\n\n"
+            "**__Premium__**\n"
+            "Premium exists to help cover hosting, storage, and API request costs. The core features of Aiko will always remain free, but premium perks are available to help to distribute some of the costs I would have to bear. By [subscribing](https://ko-fi.com/aza3l/tiers) for just $1.99 a month, you keep Aiko online and unlock extra features like 2x boost on points earned, unlimited text (in DMs), unlimited memory, and addtional support server perks like exclusive behind-the-scenes channels. Use the `/claim` command to receive your perks after becoming a supporter.❤️\n\n"
+            "**__Troubleshooting and Suggestions__**\n"
             "Feel free to join the [support server](https://discord.gg/dgwAC8TFWP) for suggestions, updates or help.\nMy developer will be happy to help! [Click here](https://discord.com/oauth2/authorize?client_id=1285298352308621416), to invite me to your server.\n\n"
-            "**Commands:**\n"
-            "**/profile:** View your profile.\n"
-            "**/dere_set:** Set Aiko's personality.\n"
-            "**/memory_clear:** Clear your memories with Aiko.\n\n"
-            "Use the `/claim` command to receive your perks after becoming a supporter. ❤️\n"
-            "Keep Aiko alive and unlock more features for $1.99! Learn more with `/premium`."
         ),
         color=0x2B2D31
     )
@@ -428,31 +594,55 @@ async def help(ctx):
 async def profile(ctx: lightbulb.Context):
     user_id = str(ctx.author.id)
     data = load_data()
-
     user_data = create_user(data, user_id)
 
+    # Get dere type
     dere_type = "Default"
     if user_data["style"]:
         dere_type = next((k for k, v in DERE_TYPES.items() if v == user_data["style"]), "Custom")
 
+    # Calculate memory usage
     memory_limit = 30
     memory_used = len(user_data["memory"]) // 2
     memory_percentage = round((memory_used / memory_limit) * 100) if not user_data["premium"] else "Unlimited"
     memory_status = f"{memory_percentage}%" if isinstance(memory_percentage, int) else "Unlimited"
 
-    embed = hikari.Embed(
-        color=0x2B2D31
-    )
-    embed.set_author(name=f"{ctx.author.username}'s Profile", icon=ctx.author.avatar_url)  
-    embed.add_field(name="Premium Status", value=f'{"✅ Active" if user_data["premium"] else "❌ Not Active"}', inline=True)
-    embed.add_field(name="Memory Usage", value=memory_status, inline=True)
-    embed.add_field(name="Dere Type", value=dere_type, inline=True)
+    # Calculate mood status
+    mood = user_data["mood"]
+    if mood < 10:
+        mood_status = "Feeling lonely 😔"
+    elif mood < 30:
+        mood_status = "Tired 😟"
+    elif mood < 50:
+        mood_status = "Neutral 😐"
+    elif mood < 70:
+        mood_status = "Content 😊"
+    elif mood < 90:
+        mood_status = "Loved 😍"
+    else:
+        mood_status = "Ecstatic 💖"
 
+    # Create embed
+    embed = hikari.Embed(
+        color=0x2B2D31,
+        description = f"Aiko is feeling `{mood_status}`"
+    )
+    embed.set_author(name=f"{ctx.author.username}'s Profile", icon=ctx.author.avatar_url)
+    embed.add_field(name="Streak", value=f"🔥 {user_data['streak']} days", inline=True)
+    embed.add_field(name="Mood", value=f"💖 {user_data['mood']}%", inline=True)
+    embed.add_field(name="Points", value=f"🏅 {user_data['points']}", inline=True)
+    embed.add_field(name="Memory", value=f'📀 {memory_status}', inline=True)
+    embed.add_field(name="Dere", value=f'🧩 {dere_type}', inline=True)
+    embed.add_field(name="Premium", value=f'{"✅ Active" if user_data["premium"] else "❌ Not Active"}', inline=True)
+    embed.set_footer("This page is not complete! Aiko is new and under extensive development.\nFeel free to visit the support server to learn more.")
+
+    # Cooldown reset for premium
     if user_data["premium"]:
         await ctx.command.cooldown_manager.reset_cooldown(ctx)
 
     await ctx.respond(embed=embed)
 
+    # Log command usage
     try:
         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
@@ -516,43 +706,6 @@ async def claim(ctx: lightbulb.Context) -> None:
             await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
         except Exception as e:
             print(f"{e}")
-
-# Premium Command
-@bot.command()
-@lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.command("premium", "View Aiko's premium perks.")
-@lightbulb.implements(lightbulb.SlashCommand)
-async def premium(ctx: lightbulb.Context) -> None:
-    user_id = str(ctx.author.id)
-    data = load_data()
-    user_data = create_user(data, user_id)
-
-    if user_data["premium"]:
-        await ctx.command.cooldown_manager.reset_cooldown(ctx)
-
-    embed = hikari.Embed(
-        title="🎁 Premium 🎁",
-        description=(
-            "Aiko Premium exists to help cover hosting, storage, and API request costs. The core features of Aiko will always remain free, but premium perks are available to help to distribute some of the costs I would have to bear. By [subscribing](https://ko-fi.com/aza3l/tiers) for just $1.99 a month, you keep Aiko online and unlock extra features listed below. ❤️\n\n"
-            "**Premium Features:**\n"
-            "• Unlimited responses from Aiko.\n"
-            "• Aiko can reply in DMs.\n"
-            "• Aiko will always remember your conversations.\n"
-            "• Remove cooldowns.\n\n"
-            "**Support Server Related Perks:**\n"
-            "• Access to behind-the-scenes Discord channels.\n"
-            "• Have a say in the development of Aiko.\n"
-            "• Supporter exclusive channels.\n\n"
-            "*Any memberships bought can be refunded within 3 days of purchase.*"
-        ),
-        color=0x2f3136
-    )
-    await ctx.respond(embed=embed)
-
-    try:
-        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
-    except Exception as e:
-        print(f"Error logging premium command: {e}")
 
 # Privacy Policy Command
 @bot.command()
