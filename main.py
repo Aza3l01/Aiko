@@ -8,6 +8,7 @@ import json
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 import time
+import datetime
 
 load_dotenv()
 DATA_FILE = 'data.json'
@@ -39,7 +40,7 @@ def update_data(new_data):
 
 data = load_data()
 
-prem_email = ['test03@gmail.com']
+prem_email = []
 user_reset_time = {}
 user_response_count = {}
 user_limit_reached = {}
@@ -202,12 +203,22 @@ async def on_guild_leave(event):
 # Premium check task
 async def check_premium_users():
     while True:
+        now = datetime.datetime.now(datetime.timezone.utc)  # Use timezone-aware UTC time
+        next_reset = now.replace(hour=0, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1)
+        time_until_reset = (next_reset - now).total_seconds()
+
+        # Sleep until the next midnight UTC
+        await asyncio.sleep(time_until_reset)
+
+        # Perform premium check
         data = load_data()
         current_time = int(time.time())
 
+        AVERAGE_MONTH_SECONDS = 2629000  # ~30.44 days
+
         for user_id, user_data in list(data["users"].items()):
             if user_data["premium"] and user_data["email"] and user_data["claim_time"]:
-                if current_time - user_data["claim_time"] >= 31 * 24 * 60 * 60:
+                if current_time - user_data["claim_time"] >= AVERAGE_MONTH_SECONDS:
                     if user_data["email"] in prem_email:
                         user_data["claim_time"] = current_time
                         prem_email.remove(user_data["email"])
@@ -219,7 +230,6 @@ async def check_premium_users():
                         await bot.rest.create_message(1285303262127325301, f"`{user_data['email']}` premium expired.")
 
         save_data(data)
-        await asyncio.sleep(24 * 60 * 60)
 
 # Create user
 def create_user(data, user_id):
@@ -333,11 +343,12 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
         if last_interaction:
             time_diff = current_time - last_interaction
             if 86400 <= time_diff < 172800:
-                user_data["streak"] += 1
-                points_to_add = 10 + (10 * user_data["streak"])
-                if is_premium:
-                    points_to_add *= 2
-                user_data["points"] += points_to_add
+                if user_data["streak"] > 0:  # Only award points if streak is maintained
+                    user_data["streak"] += 1
+                    points_to_add = 10 + (10 * user_data["streak"])
+                    if is_premium:
+                        points_to_add *= 2
+                    user_data["points"] += points_to_add
 
         user_data["last_interaction"] = current_time
         save_data(data)
@@ -361,9 +372,9 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
                     user_limit_reached[user_id] = current_time
                     return
                 else:
-                    user_data["points"] += 10
+                    user_data["points"] += 50
                     if is_premium:
-                        user_data["points"] += 10
+                        user_data["points"] += 50
                     user_data["mood"] = min(100, user_data["mood"] + 2)
                     save_data(data)
 
@@ -382,22 +393,26 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
 # Daily checks
 async def daily_maintenance():
     while True:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        next_reset = now.replace(hour=0, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1)
+        time_until_reset = (next_reset - now).total_seconds()
+
+        # Sleep until the next midnight UTC
+        await asyncio.sleep(time_until_reset)
+
+        # Perform daily reset
         data = load_data()
         current_time = time.time()
-        
+
         for user_id, user_data in data["users"].items():
-            # Mood decay
             if user_data["last_interaction"]:
                 days_since = (current_time - user_data["last_interaction"]) // 86400
                 if days_since > 0:
-                    # Decay mood by 5% per day
                     user_data["mood"] = max(0, user_data["mood"] - 5 * days_since)
-                    # Reset streak if more than 1 day since last interaction
                     if days_since > 1:
                         user_data["streak"] = 0
-        
+
         save_data(data)
-        await asyncio.sleep(86400)  # 24 hours
 
 # Commands----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -509,9 +524,9 @@ async def leaderboard(ctx):
     # Add current user's position
     if current_user_data and current_user_rank:
         user_position = (
-            f"`#{idx}` You\n"
-            f"Points: {user['points']} • "
-            f"Streak: {user['streak']}"
+            f"`#{current_user_rank}` You\n"
+            f"Points: {current_user_data['points']} • "
+            f"Streak: {current_user_data['streak']}"
         )
         
         embed.add_field(
@@ -519,13 +534,14 @@ async def leaderboard(ctx):
             value=user_position,
             inline=False
         )
-    embed.set_footer("This page is not complete! Aiko is new and under extensive development.\nFeel free to visit the support server to learn more.")
+
+    embed.set_footer("Aiko is new and under extensive development.\nFeel free to visit the support server to learn more.")
     await ctx.respond(embed=embed)
 
 # Gift command
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.command("gift", "Spend 10 points to increase Aiko's mood by 2%.")
+@lightbulb.command("gift", "Spend 10 points to gift Aiko and increase her mood.")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def gift(ctx: lightbulb.Context) -> None:
     user_id = str(ctx.author.id)
@@ -662,7 +678,7 @@ async def profile(ctx: lightbulb.Context):
     embed.add_field(name="Memory", value=f'📀 {memory_status}', inline=True)
     embed.add_field(name="Dere", value=f'🧩 {dere_type}', inline=True)
     embed.add_field(name="Premium", value=f'{"✅ Active" if user_data["premium"] else "❌ Not Active"}', inline=True)
-    embed.set_footer("This page is not complete! Aiko is new and under extensive development.\nFeel free to visit the support server to learn more.")
+    embed.set_footer("Aiko is new and under extensive development.\nFeel free to visit the support server to learn more.")
 
     # Cooldown reset for premium
     if user_data["premium"]:
