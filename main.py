@@ -534,8 +534,6 @@ async def leaderboard(ctx):
             value=user_position,
             inline=False
         )
-
-    embed.set_footer("Aiko is new and under extensive development.\nFeel free to visit the support server to learn more.")
     await ctx.respond(embed=embed)
 
 # Gift command
@@ -666,7 +664,6 @@ async def profile(ctx: lightbulb.Context):
     else:
         mood_status = "Ecstatic 💖"
 
-    # Create embed
     embed = hikari.Embed(
         color=0x2B2D31,
         description = f"Aiko is feeling `{mood_status}`"
@@ -678,15 +675,12 @@ async def profile(ctx: lightbulb.Context):
     embed.add_field(name="Memory", value=f'📀 {memory_status}', inline=True)
     embed.add_field(name="Dere", value=f'🧩 {dere_type}', inline=True)
     embed.add_field(name="Premium", value=f'{"✅ Active" if user_data["premium"] else "❌ Not Active"}', inline=True)
-    embed.set_footer("Aiko is new and under extensive development.\nFeel free to visit the support server to learn more.")
 
-    # Cooldown reset for premium
     if user_data["premium"]:
         await ctx.command.cooldown_manager.reset_cooldown(ctx)
 
     await ctx.respond(embed=embed)
 
-    # Log command usage
     try:
         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
