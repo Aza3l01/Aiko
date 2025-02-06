@@ -313,8 +313,8 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
     data = load_data()
     content = event.message.content or ""
 
-    guild_id = str(event.guild_id) if hasattr(event, 'guild_id') else None  # Fix: Handle DMs
-    is_dm = guild_id is None  # Fix: Check if it's a DM
+    guild_id = str(event.guild_id) if hasattr(event, 'guild_id') else None
+    is_dm = guild_id is None
 
     channel_id = str(event.channel_id)
     current_time = time.time()
@@ -323,7 +323,6 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
     mentions_bot = bot_mention in content
     references_message = event.message.message_reference is not None
 
-    # Check if message references bot
     if references_message:
         try:
             referenced_message = await bot.rest.fetch_message(event.channel_id, event.message.message_reference.id)
@@ -333,27 +332,26 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
     else:
         is_reference_to_bot = False
 
-    if mentions_bot or is_reference_to_bot or is_dm:  # Fix: Allow DMs to trigger AI response
+    if mentions_bot or is_reference_to_bot or is_dm:
         user_data = create_user(data, user_id)
         is_premium = user_data["premium"]
 
-        # Update interaction and streaks
         last_interaction = user_data.get("last_interaction")
-        
+
         if last_interaction:
-            time_diff = current_time - last_interaction
-            if 86400 <= time_diff < 172800:
-                if user_data["streak"] > 0:  # Only award points if streak is maintained
-                    user_data["streak"] += 1
-                    points_to_add = 10 + (10 * user_data["streak"])
-                    if is_premium:
-                        points_to_add *= 2
-                    user_data["points"] += points_to_add
+            last_date = datetime.datetime.fromtimestamp(last_interaction, tz=datetime.timezone.utc).date()
+            current_date = datetime.datetime.fromtimestamp(current_time, tz=datetime.timezone.utc).date()
+
+            if current_date > last_date:
+                user_data["streak"] += 1
+                points_to_add = 10 + (10 * user_data["streak"])
+                if is_premium:
+                    points_to_add *= 2
+                user_data["points"] += points_to_add
 
         user_data["last_interaction"] = current_time
         save_data(data)
 
-        # DM rate limiting check for non-premium users
         if is_dm and not is_premium:
             reset_time = user_reset_time.get(user_id, 0)
 
@@ -378,13 +376,12 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
                     user_data["mood"] = min(100, user_data["mood"] + 2)
                     save_data(data)
 
-        # Generate AI response
         async with bot.rest.trigger_typing(channel_id):
             ai_response = await generate_text(content, user_id)
 
         user_response_count[user_id] = user_response_count.get(user_id, 0) + 1
         response_message = f"{event.message.author.mention} {ai_response}"
-        
+
         try:
             await event.message.respond(response_message)
         except hikari.errors.ForbiddenError:
@@ -395,23 +392,23 @@ async def daily_maintenance():
     while True:
         now = datetime.datetime.now(datetime.timezone.utc)
         next_reset = now.replace(hour=0, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1)
-        time_until_reset = (next_reset - now).total_seconds()
+        await asyncio.sleep((next_reset - now).total_seconds())
 
-        # Sleep until the next midnight UTC
-        await asyncio.sleep(time_until_reset)
-
-        # Perform daily reset
         data = load_data()
         current_time = time.time()
+        current_date = datetime.datetime.fromtimestamp(current_time, tz=datetime.timezone.utc).date()
 
         for user_id, user_data in data["users"].items():
             if user_data["last_interaction"]:
-                days_since = (current_time - user_data["last_interaction"]) // 86400
+                last_date = datetime.datetime.fromtimestamp(
+                    user_data["last_interaction"], tz=datetime.timezone.utc
+                ).date()
+                days_since = (current_date - last_date).days
+
                 if days_since > 0:
                     user_data["mood"] = max(0, user_data["mood"] - 5 * days_since)
                     if days_since > 1:
                         user_data["streak"] = 0
-
         save_data(data)
 
 # Commands----------------------------------------------------------------------------------------------------------------------------------------
@@ -549,24 +546,19 @@ async def gift(ctx: lightbulb.Context) -> None:
     cost = 10
     mood_increase = 2
 
-    # Reset cooldown for premium users
     if user_data["premium"]:
         await ctx.command.cooldown_manager.reset_cooldown(ctx)
 
-    # Check if user has enough points
     if user_data["points"] < cost:
         await ctx.respond(f"You need at least {cost} points to use this command. You currently have {user_data['points']} points. ❌")
         return
 
-    # Deduct points and increase mood
     user_data["points"] -= cost
     user_data["mood"] = min(100, user_data["mood"] + mood_increase)
     save_data(data)
 
-    # Send confirmation
     await ctx.respond(f"🎁 You spent {cost} points to increase Aiko's mood by {mood_increase}%! Her mood is now {user_data['mood']}%! 💖")
 
-    # Log command usage
     try:
         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
@@ -638,18 +630,15 @@ async def profile(ctx: lightbulb.Context):
     data = load_data()
     user_data = create_user(data, user_id)
 
-    # Get dere type
     dere_type = "Default"
     if user_data["style"]:
         dere_type = next((k for k, v in DERE_TYPES.items() if v == user_data["style"]), "Custom")
 
-    # Calculate memory usage
     memory_limit = 30
     memory_used = len(user_data["memory"]) // 2
     memory_percentage = round((memory_used / memory_limit) * 100) if not user_data["premium"] else "Unlimited"
     memory_status = f"{memory_percentage}%" if isinstance(memory_percentage, int) else "Unlimited"
 
-    # Calculate mood status
     mood = user_data["mood"]
     if mood < 10:
         mood_status = "Feeling lonely 😔"
