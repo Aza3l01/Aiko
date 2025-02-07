@@ -523,31 +523,55 @@ async def leaderboard(ctx):
 # Gift command
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.command("gift", "Spend 10 points to gift Aiko and increase her bond.")
+@lightbulb.option("max_points", "Gift all possible points to max bond", type=bool, required=False, default=False)
+@lightbulb.option("amount", "Number of points to gift", type=int, required=False)
+@lightbulb.command("gift", "Gift points to increase Aiko's bond.")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def gift(ctx: lightbulb.Context) -> None:
     user_id = str(ctx.author.id)
     data = load_data()
     user_data = create_user(data, user_id)
 
-    cost = 10
-    bond_increase = 2
+    max_bond = 100
+    current_bond = user_data["bond"]
+    points_available = user_data["points"]
 
-    if user_data["premium"]:
-        await ctx.command.cooldown_manager.reset_cooldown(ctx)
+    # If user chooses to gift all possible points
+    if ctx.options.max_points:
+        points_needed = max_bond - current_bond  # How much bond is needed
+        points_to_gift = min(points_needed, points_available)  # Use max available points if not enough
+    else:
+        # If user specifies an amount
+        if ctx.options.amount is None:
+            await ctx.respond("❌ Please specify an amount or use 'max_points' to fill the bond completely.")
+            return
+        points_to_gift = ctx.options.amount
 
-    if user_data["points"] < cost:
-        await ctx.respond(f"You need at least {cost} points to use this command. You currently have {user_data['points']} points. ❌")
+    # Ensure the user has enough points
+    if points_to_gift <= 0:
+        await ctx.respond("❌ You need to gift at least **1** point.")
+        return
+    if points_to_gift > points_available:
+        await ctx.respond(f"❌ You only have **{points_available}** points available.")
         return
 
-    user_data["points"] -= cost
-    user_data["bond"] = min(100, user_data["bond"] + bond_increase)
+    # Calculate bond increase and round it
+    bond_increase = round(points_to_gift)
+    new_bond = min(max_bond, current_bond + bond_increase)
+
+    # Deduct points and update bond
+    user_data["points"] -= points_to_gift
+    user_data["bond"] = new_bond
     save_data(data)
 
-    await ctx.respond(f"🎁 You spent {cost} points to increase Aiko's bond by {bond_increase}%! Her bond is now {user_data['bond']}%! 💖")
+    await ctx.respond(
+        f"🎁 You gifted **{points_to_gift}** points! Aiko's bond increased by **{bond_increase}%** and is now at **{new_bond}%**! 💖"
+    )
 
     try:
-        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+        await bot.rest.create_message(
+            1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`."
+        )
     except Exception as e:
         print(f"Error logging gift command: {e}")
 
