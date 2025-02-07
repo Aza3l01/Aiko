@@ -365,7 +365,7 @@ async def generate_text(prompt, user_id):
 
         # Determine bond level and dere type
         bond_level = get_bond_level(user_data["bond"])
-        dere_type = user_data["style"] if user_data["style"] else "Default"
+        dere_type = user_data["style"] if user_data["style"] else "Default"  # Now always a string
 
         # Get the personality-based prompt
         personality_prompt = DERE_TYPES.get(dere_type, DERE_TYPES["Default"]).get(bond_level, "")
@@ -550,7 +550,7 @@ async def check_vote_expiration():
 # Set dere command
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.option('personality', 'Choose a dere type for Aiko.', choices=["Default"] + list(DERE_TYPES.keys()), type=str)
+@lightbulb.option('personality', 'Choose a dere type for Aiko.', choices=list(DERE_TYPES.keys()), type=str)
 @lightbulb.command('dere_set', 'Set Aiko\'s dere type personality.')
 @lightbulb.implements(lightbulb.SlashCommand)
 async def dere_set(ctx: lightbulb.Context) -> None:
@@ -561,13 +561,13 @@ async def dere_set(ctx: lightbulb.Context) -> None:
     user_data = create_user(data, user_id)
 
     if selected_personality == "Default":
-        user_data["style"] = None
+        user_data["style"] = None  # Reset to default
         save_data(data)
         await ctx.respond("My personality has been reset to default. Let’s start fresh! 😊 What would you like to talk about?")
     else:
-        user_data["style"] = DERE_TYPES[selected_personality]
+        user_data["style"] = selected_personality  # ✅ Store the personality as a string, not a dictionary
         save_data(data)
-        await ctx.respond(f'My personality has been set to: “{selected_personality}".')
+        await ctx.respond(f'My personality has been set to: “{selected_personality}”.')
 
     try:
         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
