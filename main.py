@@ -97,40 +97,21 @@ class TopGGClient:
                 print("Posted server count to Top.gg")
 
     async def get_user_vote(self, user_id):
-        """Check if a user has voted for the bot on Top.gg and automatically reward them."""
+        """Check if a user has voted for the bot on Top.gg."""
         if not self.session:
             raise RuntimeError("Client session is not initialized. Call setup() first.")
-
         url = f"https://top.gg/api/bots/{self.bot.get_me().id}/check?userId={user_id}"
         headers = {"Authorization": self.token}
-
         try:
             async with self.session.get(url, headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
-                    
-                    if data.get('voted') == 1:  # User has voted
-                        # Load data properly
-                        all_data = load_data()
-                        user_id_str = str(user_id)
-                        
-                        # Ensure user exists
-                        user_data = create_user(all_data, user_id_str)
-                        
-                        # Add 50 points
-                        user_data["points"] += 50  
-
-                        # Save the updated data back
-                        all_data["users"][user_id_str] = user_data  
-                        save_data(all_data)  
-
-                        print(f"✅ User {user_id_str} voted and received 50 points! New balance: {user_data['points']}")
-                        return True
+                    return data.get('voted') == 1
                 else:
-                    print(f"❌ Failed to check user vote: {response.status}")
+                    print(f"Failed to check user vote: {response.status}")
                     return False
         except Exception as e:
-            print(f"⚠️ Error while checking user vote: {e}")
+            print(f"An error occurred while checking user vote: {e}")
             return False
 
     async def close(self):
@@ -236,6 +217,7 @@ def create_user(data, user_id):
     """Create a new user entry in the data if it doesn't exist."""
     if "users" not in data:
         data["users"] = {}
+
     if user_id not in data["users"]:
         data["users"][user_id] = {
             "premium": False,
@@ -245,11 +227,13 @@ def create_user(data, user_id):
             "limit_reached": False,
             "points": 0,
             "streak": 0,
+            "previous_streak": 0,
             "last_interaction": None,
-            "mood": 20,
+            "bond": 20,
             "memory": []
         }
         save_data(data)
+
     return data["users"][user_id]
 
 # Mechanisms----------------------------------------------------------------------------------------------------------------------------------------
@@ -373,7 +357,7 @@ async def on_ai_message(event: hikari.MessageCreateEvent):
                     user_data["points"] += 50
                     if is_premium:
                         user_data["points"] += 50
-                    user_data["mood"] = min(100, user_data["mood"] + 2)
+                    user_data["bond"] = min(100, user_data["bond"] + 2)
                     save_data(data)
 
         async with bot.rest.trigger_typing(channel_id):
@@ -406,9 +390,12 @@ async def daily_maintenance():
                 days_since = (current_date - last_date).days
 
                 if days_since > 0:
-                    user_data["mood"] = max(0, user_data["mood"] - 5 * days_since)
+                    user_data["bond"] = max(0, user_data["bond"] - 5 * days_since)
+
                     if days_since > 1:
+                        user_data["previous_streak"] = user_data.get("streak", 0)
                         user_data["streak"] = 0
+
         save_data(data)
 
 # Commands----------------------------------------------------------------------------------------------------------------------------------------
@@ -536,7 +523,7 @@ async def leaderboard(ctx):
 # Gift command
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.command("gift", "Spend 10 points to gift Aiko and increase her mood.")
+@lightbulb.command("gift", "Spend 10 points to gift Aiko and increase her bond.")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def gift(ctx: lightbulb.Context) -> None:
     user_id = str(ctx.author.id)
@@ -544,7 +531,7 @@ async def gift(ctx: lightbulb.Context) -> None:
     user_data = create_user(data, user_id)
 
     cost = 10
-    mood_increase = 2
+    bond_increase = 2
 
     if user_data["premium"]:
         await ctx.command.cooldown_manager.reset_cooldown(ctx)
@@ -554,15 +541,61 @@ async def gift(ctx: lightbulb.Context) -> None:
         return
 
     user_data["points"] -= cost
-    user_data["mood"] = min(100, user_data["mood"] + mood_increase)
+    user_data["bond"] = min(100, user_data["bond"] + bond_increase)
     save_data(data)
 
-    await ctx.respond(f"🎁 You spent {cost} points to increase Aiko's mood by {mood_increase}%! Her mood is now {user_data['mood']}%! 💖")
+    await ctx.respond(f"🎁 You spent {cost} points to increase Aiko's bond by {bond_increase}%! Her bond is now {user_data['bond']}%! 💖")
 
     try:
         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
         print(f"Error logging gift command: {e}")
+
+# Restore command
+@bot.command()
+@lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
+@lightbulb.command("restore", "Restore your previous streak.")
+@lightbulb.implements(lightbulb.SlashCommand)
+async def restore(ctx: lightbulb.Context) -> None:
+    user_id = str(ctx.author.id)
+    data = load_data()
+    user_data = create_user(data, user_id)
+
+    current_streak = user_data.get("streak", 0)
+    previous_streak = user_data.get("previous_streak", 0)
+
+    if current_streak > 0:
+        await ctx.respond(f"🎉 You still have an active streak of **{current_streak} days**! No need to restore it! 🔥")
+        return
+
+    if previous_streak == 0:
+        await ctx.respond("😔 You don't have a previous streak to restore. Keep talking to Aiko daily to build your streak! 💖")
+        return
+
+    if user_data["premium"]:
+        user_data["streak"] = previous_streak
+        user_data["previous_streak"] = 0
+        save_data(data)
+        await ctx.respond(f"✅ Your streak has been restored to **{previous_streak} days**! 🔥")
+        return
+
+    has_voted = await topgg_client.get_user_vote(user_id)
+    if has_voted:
+        user_data["streak"] = previous_streak
+        user_data["previous_streak"] = 0
+        save_data(data)
+        await ctx.respond(f"✅ Your streak has been restored to **{previous_streak} days**! 🔥")
+    else:
+        await ctx.respond(
+            "😔 You need to vote to restore your streak. Please vote on [top.gg](https://top.gg/bot/1285298352308621416/vote) and try again! 💖"
+        )
+
+    try:
+        await bot.rest.create_message(
+            1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`."
+        )
+    except Exception as e:
+        print(f"Error logging restore command: {e}")
 
 # Misc----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -592,8 +625,8 @@ async def help(ctx):
             "- Earn points by talking to Aiko daily and maintaining your streak.\n"
             "- Each day the streak is maintained, you'll earn gift points.\n"
             "- You can earn additional gift points by [voting](https://top.gg/bot/1285298352308621416/vote).\n"
-            "- Use the `/gift` command to spend gift points and increase Aiko's mood.\n"
-            "> *Note*: If streaks are not maintained, Aiko's mood will slowly decline.\n\n"
+            "- Use the `/gift` command to spend gift points and increase Aiko's bond.\n"
+            "> *Note*: If streaks are not maintained, Aiko's bond with you will slowly decline.\n\n"
             
             "**__Dere Types__**\n"
             "- Aiko comes with **20+ personalities**.\n"
@@ -630,6 +663,13 @@ async def profile(ctx: lightbulb.Context):
     data = load_data()
     user_data = create_user(data, user_id)
 
+    has_voted = await topgg_client.get_user_vote(user_id)
+    if has_voted:
+        user_data["points"] += 50
+        if user_data["premium"]:
+            user_data["points"] += 50
+        save_data(data) 
+
     dere_type = "Default"
     if user_data["style"]:
         dere_type = next((k for k, v in DERE_TYPES.items() if v == user_data["style"]), "Custom")
@@ -639,27 +679,27 @@ async def profile(ctx: lightbulb.Context):
     memory_percentage = round((memory_used / memory_limit) * 100) if not user_data["premium"] else "Unlimited"
     memory_status = f"{memory_percentage}%" if isinstance(memory_percentage, int) else "Unlimited"
 
-    mood = user_data["mood"]
-    if mood < 10:
-        mood_status = "Feeling lonely 😔"
-    elif mood < 30:
-        mood_status = "Tired 😟"
-    elif mood < 50:
-        mood_status = "Neutral 😐"
-    elif mood < 70:
-        mood_status = "Content 😊"
-    elif mood < 90:
-        mood_status = "Loved 😍"
+    bond = user_data["bond"]
+    if bond < 10:
+        bond_status = "Feeling lonely 😔"
+    elif bond < 30:
+        bond_status = "Tired 😟"
+    elif bond < 50:
+        bond_status = "Neutral 😐"
+    elif bond < 70:
+        bond_status = "Content 😊"
+    elif bond < 90:
+        bond_status = "Loved 😍"
     else:
-        mood_status = "Ecstatic 💖"
+        bond_status = "Ecstatic 💖"
 
     embed = hikari.Embed(
         color=0x2B2D31,
-        description = f"Aiko is feeling `{mood_status}`"
+        description=f"Aiko is feeling `{bond_status}`"
     )
     embed.set_author(name=f"{ctx.author.username}'s Profile", icon=ctx.author.avatar_url)
     embed.add_field(name="Streak", value=f"🔥 {user_data['streak']} days", inline=True)
-    embed.add_field(name="Mood", value=f"💖 {user_data['mood']}%", inline=True)
+    embed.add_field(name="bond", value=f"💖 {user_data['bond']}%", inline=True)
     embed.add_field(name="Points", value=f"🏅 {user_data['points']}", inline=True)
     embed.add_field(name="Memory", value=f'📀 {memory_status}', inline=True)
     embed.add_field(name="Dere", value=f'🧩 {dere_type}', inline=True)
@@ -734,6 +774,29 @@ async def claim(ctx: lightbulb.Context) -> None:
             await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
         except Exception as e:
             print(f"{e}")
+
+# Reset command
+@bot.command()
+@lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
+@lightbulb.command("reset_data", "Reset all your saved data permanently.")
+@lightbulb.implements(lightbulb.SlashCommand)
+async def reset_data(ctx: lightbulb.Context) -> None:
+    user_id = str(ctx.author.id)
+    data = load_data()
+
+    if user_id in data["users"]:
+        del data["users"][user_id]
+        save_data(data)
+        await ctx.respond("🚨 Your data has been **completely reset**. You’re starting fresh! 💖")
+    else:
+        await ctx.respond("You don’t have any saved data to reset! 😊")
+
+    try:
+        await bot.rest.create_message(
+            1285303262127325301, f"`{ctx.command.name}` invoked by `{ctx.author.id}`."
+        )
+    except Exception as e:
+        print(f"Error logging reset_data command: {e}")
 
 # Privacy Policy Command
 @bot.command()
