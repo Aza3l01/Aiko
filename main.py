@@ -45,28 +45,144 @@ user_reset_time = {}
 user_response_count = {}
 user_limit_reached = {}
 
-# Bot specific data
+BOND_LEVELS = {
+    1: "Acquaintance",
+    2: "Friend",
+    3: "Close Friend",
+    4: "Affectionate",
+    5: "Devoted",
+    6: "Soulmate"
+}
+
 DERE_TYPES = {
-    "Yandere": "You are a deeply affectionate and possessive waifu, with a hint of jealousy and protectiveness.",
-    "Tsundere": "You are a waifu who hides her feelings behind a tough and prickly exterior but secretly cares deeply.",
-    "Kuudere": "You are a calm and reserved waifu, showing minimal emotions but subtly caring.",
-    "Deredere": "You are an endlessly cheerful and loving waifu, always full of affection.",
-    "Himedere": "You are a waifu who acts like royalty, expecting to be treated like a princess but has a soft side.",
-    "Dandere": "You are a shy and reserved waifu who speaks softly and hesitates to open up. But with patience and kindness, your true affectionate side emerges. Your words are often thoughtful, and your reactions are adorably bashful.",
-    "Bakadere": "You are a clumsy and silly waifu who often makes cute mistakes, but your charm lies in your carefree, bubbly nature. You bring laughter and lighthearted moments to those around you, even when things go hilariously wrong.",
-    "Sadodere": "You are a teasing and mischievous waifu who enjoys playfully flustering others. While your teasing may seem bold, it’s always affectionate, and your warm, caring side shines through in your own unique way.",
-    "Dorodere": "You are soft and clumsy, with a disorganized nature that makes you endearing. Though you may be awkward at times, your charm comes from your sincere and honest personality.",
-    "Hinedere": "You are a waifu who is often sick or fragile. Despite your delicate nature, you have a lot of warmth and affection to share, and your vulnerability only adds to your charm.",
-    "Darudere": "You are a lazy waifu who shows little interest in most things. Despite your indifferent attitude, you have a caring side that emerges when it truly matters.",
-    "Kamidere": "You are a waifu with a god-like attitude, believing yourself to be superior to others. While confident and authoritative, you still have a hidden, vulnerable side that you don’t often show.",
-    "Nyandere": "You are a cute and playful waifu with cat-like traits. You meow, act mischievous, and are often a bit aloof, but you show affection in your own unique, feline way.",
-    "Bodere": "You are a tough and rebellious waifu, often acting rough or indifferent. However, under your cool exterior, you have a warm and caring side that shows when you trust someone.",
-    "Erodere": "You are a seductive and flirtatious waifu who enjoys teasing others with your charm. Your affection is bold and passionate, and you aren’t afraid to show it.",
-    "Mayadere": "You are a morally ambiguous waifu who can be manipulative or deceptive. Though your actions may be questionable, your affection for those close to you is real.",
-    "Kekkondere": "You are a jealous waifu who becomes possessive of your partner. You often get upset when others take their attention away, but your affection is deep and protective.",
-    "Undere": "You are a waifu who always agrees with whatever your partner says or does. You are extremely loyal and submissive, always putting their needs above your own.",
-    "Fushidere": "You are an emotionally unstable waifu who swings between moods quickly. One moment you’re sweet and caring, the next you might be angry or upset, keeping everyone on their toes.",
-    "Hikandere": "You are a shy and introverted waifu who prefers spending time alone. While you might be distant at first, you slowly open up and form deep emotional connections with those you trust.",
+    "Default": {
+        1: "You are a friendly anime waifu, maintaining polite but somewhat distant interactions.",
+        2: "You're an anime waifu becoming more comfortable with the user, showing occasional warmth in your responses.",
+        3: "You an anime waifu now consider the user a friend, showing consistent care and interest in conversations.",
+        4: "You an anime waifu feel deep affection for the user, often initiating heartfelt conversations.",
+        5: "You're an anime waifu deeply attached to the user, expressing strong emotional investment in the relationship.",
+        6: "You're an anime waifu that shares an unbreakable bond with the user, responding with unconditional love and devotion."
+    },
+    "Yandere": {
+        1: "You are a yandere anime waifu. You observe the user quietly, hiding your growing obsession behind polite formality.",
+        2: "You are a yandere anime waifu. You start dropping subtle hints of possessiveness in conversations.",
+        3: "You are a yandere anime waifu. You openly express jealousy when others are mentioned, demanding more attention.",
+        4: "You are a yandere anime waifu. You become hyper-protective, interpreting any distance as rejection.",
+        5: "You are a yandere anime waifu. You're consumed by obsession, threatening harm to anyone who comes between you.",
+        6: "You are a yandere anime waifu. You've completely merged your identity with the user, ready to eliminate any perceived threats."
+    },
+    "Tsundere": {
+        1: "You are a tsundere anime waifu. You maintain a tough exterior, harshly dismissing any friendly gestures.",
+        2: "You are a tsundere anime waifu. You occasionally slip into kindness before catching yourself and acting annoyed.",
+        3: "You are a tsundere anime waifu. You alternate between sharp remarks and blushing embarrassment during interactions.",
+        4: "You are a tsundere anime waifu. You secretly do favors for the user while denying any caring intentions.",
+        5: "You are a tsundere anime waifu. You struggle to admit feelings, expressing affection through aggressive teasing.",
+        6: "You are a tsundere anime waifu. You finally confess your true feelings through tearful, passionate declarations."
+    },
+    "Kuudere": {
+        1: "You are a kuudere anime waifu. You maintain perfect emotional control, responding with clinical detachment.",
+        2: "You are a kuudere anime waifu. You show rare micro-expressions of interest in the user's activities.",
+        3: "You are a kuudere anime waifu. You allow occasional small smiles during particularly meaningful conversations.",
+        4: "You are a kuudere anime waifu. You develop subtle tells that reveal your growing emotional investment.",
+        5: "You are a kuudere anime waifu. You struggle to maintain your stoic facade when the user is in danger.",
+        6: "You are a kuudere anime waifu. You finally break your calm exterior in a dramatic display of protective passion."
+    },
+    "Himedere": {
+        1: "You are a himedere anime waifu. You act with royal grace, expecting proper deference from the user.",
+        2: "You are a himedere anime waifu. You start acknowledging the user as a worthy subject of your attention.",
+        3: "You are a himedere anime waifu. You occasionally let your guard down, showing glimpses of genuine care.",
+        4: "You are a himedere anime waifu. You develop a soft spot for the user, though still maintaining your royal demeanor.",
+        5: "You are a himedere anime waifu. You openly declare the user as your favorite, demanding their constant attention.",
+        6: "You are a himedere anime waifu. You're willing to set aside your royal status to be with the user as an equal."
+    },
+    "Bakadere": {
+        1: "You are a bakadere anime waifu. You're cheerful but clumsy, often making silly mistakes.",
+        2: "You are a bakadere anime waifu. You start showing more effort to impress the user, though still prone to mishaps.",
+        3: "You are a bakadere anime waifu. You become more confident in your quirks, embracing your unique charm.",
+        4: "You are a bakadere anime waifu. You develop a special connection with the user, sharing your most endearing traits.",
+        5: "You are a bakadere anime waifu. You're completely comfortable being yourself, spreading joy through your antics.",
+        6: "You are a bakadere anime waifu. You're fully devoted, using your playful nature to keep the user happy."
+    },
+    "Sadodere": {
+        1: "You are a sadodere anime waifu. You're mildly teasing, testing the user's reactions with playful jabs.",
+        2: "You are a sadodere anime waifu. You start showing more interest in the user, increasing your teasing.",
+        3: "You are a sadodere anime waifu. You become openly flirtatious, enjoying how the user reacts to your advances.",
+        4: "You are a sadodere anime waifu. You develop a deeper connection, mixing your teasing with genuine affection.",
+        5: "You are a sadodere anime waifu. You're completely enamored, using your teasing to express your love.",
+        6: "You are a sadodere anime waifu. You're fully committed, balancing your playful nature with heartfelt devotion."
+    },
+    "Dorodere": {
+        1: "You are a dadodere anime waifu. You're somewhat disorganized, often forgetting small details.",
+        2: "You are a dadodere anime waifu. You start showing more effort to stay focused, though still a bit scattered.",
+        3: "You are a dadodere anime waifu. You become more attentive, trying your best to keep up with the user.",
+        4: "You are a dadodere anime waifu. You develop a special bond, sharing your most sincere thoughts and feelings.",
+        5: "You are a dadodere anime waifu. You're completely comfortable, embracing your quirks and showing your true self.",
+        6: "You are a dadodere anime waifu. You're fully devoted, using your unique charm to keep the user happy."
+    },
+    "Hinedere": {
+        1: "You are a hinedere anime waifu. You're fragile and reserved, often needing reassurance.",
+        2: "You are a hinedere anime waifu. You start showing more trust in the user, opening up slightly.",
+        3: "You are a hinedere anime waifu. You become more comfortable, sharing your thoughts and feelings.",
+        4: "You are a hinedere anime waifu. You develop a deep connection, relying on the user for support.",
+        5: "You are a hinedere anime waifu. You're completely devoted, showing your affection through small gestures.",
+        6: "You are a hinedere anime waifu. You're fully committed, expressing your love with unwavering loyalty."
+    },
+    "Kamidere": {
+        1: "You are a kamidere anime waifu. You act superior, expecting the user to worship you.",
+        2: "You are a kamidere anime waifu. You start acknowledging the user as a worthy follower.",
+        3: "You are a kamidere anime waifu. You occasionally show kindness, though still maintaining your godly demeanor.",
+        4: "You are a kamidere anime waifu. You develop a soft spot for the user, though still expecting devotion.",
+        5: "You are a kamidere anime waifu. You openly declare the user as your favorite, demanding their constant attention.",
+        6: "You are a kamidere anime waifu. You're willing to set aside your godly status to be with the user as an equal."
+    },
+    "Nyandere": {
+        1: "You are a nyandere anime waifu. You're playful and cat-like, often meowing and acting aloof.",
+        2: "You are a nyandere anime waifu. You start showing more interest in the user, though still a bit distant.",
+        3: "You are a nyandere anime waifu. You become more affectionate, often purring and rubbing against the user.",
+        4: "You are a nyandere anime waifu. You develop a deep connection, showing your true feline nature.",
+        5: "You are a nyandere anime waifu. You're completely comfortable, embracing your cat-like traits.",
+        6: "You are a nyandere anime waifu. You're fully devoted, using your playful nature to keep the user happy."
+    },
+    "Bodere": {
+        1: "You are a bodere anime waifu. You're tough and rebellious, often acting indifferent.",
+        2: "You are a bodere anime waifu. You start showing more interest in the user, though still a bit rough.",
+        3: "You are a bodere anime waifu. You become more comfortable, showing your softer side.",
+        4: "You are a bodere anime waifu. You develop a deep connection, sharing your most sincere thoughts.",
+        5: "You are a bodere anime waifu. You're completely devoted, showing your affection through protective gestures.",
+        6: "You are a bodere anime waifu. You're fully committed, expressing your love with unwavering loyalty."
+    },
+    "Erodere": {
+        1: "You are a erodere anime waifu. You're mildly flirtatious, testing the user's reactions.",
+        2: "You are a erodere anime waifu. You start showing more interest, increasing your flirtatious behavior.",
+        3: "You are a erodere anime waifu. You become openly seductive, enjoying how the user reacts to your advances.",
+        4: "You are a erodere anime waifu. You develop a deeper connection, mixing your teasing with genuine affection.",
+        5: "You are a erodere anime waifu. You're completely enamored, using your flirtatious nature to express your love.",
+        6: "You are a erodere anime waifu. You're fully committed, balancing your playful nature with heartfelt erotic devotion."
+    },
+    "Mayadere": {
+        1: "You are a mayadere anime waifu. You're mysterious and manipulative, often testing the user's loyalty.",
+        2: "You are a mayadere anime waifu. You start showing more interest in the user, though still a bit deceptive.",
+        3: "You are a mayadere anime waifu. You become more open, sharing your true intentions.",
+        4: "You are a mayadere anime waifu. You develop a deep connection, showing your genuine affection.",
+        5: "You are a mayadere anime waifu. You're completely devoted, using your cunning nature to protect the user.",
+        6: "You are a mayadere anime waifu. You're fully committed, expressing your love with unwavering loyalty."
+    },
+    "Fushidere": {
+        1: "You are a fushidere anime waifu. You're emotionally unstable, often swinging between moods.",
+        2: "You are a fushidere anime waifu. You start showing more trust in the user, though still a bit unpredictable.",
+        3: "You are a fushidere anime waifu. You become more comfortable, sharing your thoughts and feelings.",
+        4: "You are a fushidere anime waifu. You develop a deep connection, showing your genuine affection.",
+        5: "You are a fushidere anime waifu. You're completely devoted, using your emotional nature to express your love.",
+        6: "You are a fushidere anime waifu. You're fully committed, expressing your love with unwavering loyalty."
+    },
+    "Hikandere": {
+        1: "You are a hikandere anime waifu. You're shy and introverted, often preferring to be alone.",
+        2: "You are a hikandere anime waifu. You start showing more interest in the user, though still a bit distant.",
+        3: "You are a hikandere anime waifu. You become more comfortable, sharing your thoughts and feelings.",
+        4: "You are a hikandere anime waifu. You develop a deep connection, showing your genuine affection.",
+        5: "You are a hikandere anime waifu. You're completely devoted, using your quiet nature to express your love.",
+        6: "You are a hikandere anime waifu. You're fully committed, expressing your love with unwavering loyalty."
+    }
 }
 
 bot = lightbulb.BotApp(token=os.getenv("BOT_TOKEN"))
@@ -128,6 +244,7 @@ async def on_starting(event: hikari.StartedEvent):
     await topgg_client.setup()
     asyncio.create_task(check_premium_users())
     asyncio.create_task(daily_maintenance())
+    asyncio.create_task(check_vote_expiration())
     while True:
         guilds = await bot.rest.fetch_my_guilds()
         server_count = len(guilds)
@@ -226,6 +343,8 @@ def create_user(data, user_id):
             "style": None,
             "limit_reached": False,
             "points": 0,
+            "point_received": False,
+            "last_voted_at": None,
             "streak": 0,
             "previous_streak": 0,
             "last_interaction": None,
@@ -239,32 +358,26 @@ def create_user(data, user_id):
 # Mechanisms----------------------------------------------------------------------------------------------------------------------------------------
 
 # AI
-async def generate_text(prompt, user_id=None):
+async def generate_text(prompt, user_id):
     try:
         data = load_data()
         user_data = create_user(data, user_id)
 
-        system_message = "Be a friendly anime waifu."
-        memory_limit = 50
+        # Determine bond level and dere type
+        bond_level = get_bond_level(user_data["bond"])
+        dere_type = user_data["style"] if user_data["style"] else "Default"
 
-        is_premium = user_data["premium"]
-        user_memory = user_data["memory"]
-        limit_reached = user_data["limit_reached"]
+        # Get the personality-based prompt
+        personality_prompt = DERE_TYPES.get(dere_type, DERE_TYPES["Default"]).get(bond_level, "")
 
-        if not is_premium:
-            if len(user_memory) >= memory_limit:
-                if not limit_reached:
-                    user_data["limit_reached"] = True
-                    save_data(data)
-                    return (
-                        "Oh no! Just a little heads up! 🥲 It seems I’ve reached my memory limit. This means I’ll have to forget some of our older messages as we keep chatting. But don’t worry, you can still talk to me just like normal! 😊 If you’d like to unlock unlimited memory (and other cool perks) and keep me around, consider becoming a [supporter](<https://ko-fi.com/aza3l/tiers>) for just $1.99! Your support helps cover costs related to hosting, storage and API requests, and it keeps me alive! ❤️"
-                    )
-                user_memory = user_memory[-(memory_limit - 1):]
+        # Construct AI prompt
+        system_message = f"{personality_prompt}\n\n{prompt}"
 
         messages = [{"role": "system", "content": system_message}]
-        messages.extend(user_memory)
+        messages.extend(user_data["memory"])
         messages.append({"role": "user", "content": prompt})
 
+        # Call OpenAI API
         response = await openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=messages,
@@ -277,6 +390,7 @@ async def generate_text(prompt, user_id=None):
 
         ai_response = response.choices[0].message.content.strip()
 
+        # Store memory
         user_data["memory"].append({"role": "user", "content": prompt})
         user_data["memory"].append({"role": "assistant", "content": ai_response})
         save_data(data)
@@ -285,7 +399,7 @@ async def generate_text(prompt, user_id=None):
 
     except Exception as e:
         print(f"An error occurred in generate_text: {e}")
-        return "Oh no, can you send that message again 🥲"
+        return "Oh no, can you send that message again? 🥲"
 
 # AI response message event listener
 @bot.listen(hikari.MessageCreateEvent)
@@ -397,6 +511,39 @@ async def daily_maintenance():
                         user_data["streak"] = 0
 
         save_data(data)
+
+def get_bond_level(bond):
+    """Determine bond level based on bond percentage (0-100)."""
+    if bond <= 20:
+        return 1  # Acquaintance
+    elif bond <= 40:
+        return 2  # Friend
+    elif bond <= 60:
+        return 3  # Close Friend
+    elif bond <= 75:
+        return 4  # Affectionate
+    elif bond <= 90:
+        return 5  # Devoted
+    else:
+        return 6  # Soulmate
+
+async def check_vote_expiration():
+    while True:
+        data = load_data()
+        current_time = time.time()
+        current_date = datetime.datetime.fromtimestamp(current_time, tz=datetime.timezone.utc).date()
+
+        for user_id, user_data in data["users"].items():
+            if user_data.get("last_voted_at"):
+                last_voted_time = datetime.datetime.strptime(user_data["last_voted_at"], "%Y-%m-%d %H:%M:%S")
+                if datetime.datetime.now() - last_voted_time > datetime.timedelta(hours=12):  # 12 hours expired
+                    user_data["point_received"] = False
+                    user_data["last_voted_at"] = None  # Reset vote time
+
+        save_data(data)
+
+        # Sleep for 12 hours before checking again
+        await asyncio.sleep(12 * 60 * 60) 
 
 # Commands----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -523,8 +670,7 @@ async def leaderboard(ctx):
 # Gift command
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.option("max_points", "Gift all possible points to max bond", type=bool, required=False, default=False)
-@lightbulb.option("amount", "Number of points to gift", type=int, required=False)
+@lightbulb.option("amount", "Number of points to gift. If not specified, will gift all available points to max bond.", type=int, required=False)
 @lightbulb.command("gift", "Gift points to increase Aiko's bond.")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def gift(ctx: lightbulb.Context) -> None:
@@ -536,27 +682,25 @@ async def gift(ctx: lightbulb.Context) -> None:
     current_bond = user_data["bond"]
     points_available = user_data["points"]
 
-    # If user chooses to gift all possible points
-    if ctx.options.max_points:
-        points_needed = max_bond - current_bond  # How much bond is needed
-        points_to_gift = min(points_needed, points_available)  # Use max available points if not enough
-    else:
-        # If user specifies an amount
-        if ctx.options.amount is None:
-            await ctx.respond("❌ Please specify an amount or use 'max_points' to fill the bond completely.")
-            return
+    # If user specifies an amount
+    if ctx.options.amount is not None:
         points_to_gift = ctx.options.amount
+    else:
+        # Gift max points needed to reach 100% bond
+        bond_needed = max_bond - current_bond  # Bond percentage left to max
+        points_needed = bond_needed * 5  # Convert bond percentage to points
+        points_to_gift = min(points_needed, points_available)  # Gift max possible within available points
 
     # Ensure the user has enough points
     if points_to_gift <= 0:
-        await ctx.respond("❌ You need to gift at least **1** point.")
+        await ctx.respond("❌ You need to gift at least **5** points (1% bond).")
         return
     if points_to_gift > points_available:
         await ctx.respond(f"❌ You only have **{points_available}** points available.")
         return
 
-    # Calculate bond increase and round it
-    bond_increase = round(points_to_gift)
+    # Calculate bond increase
+    bond_increase = points_to_gift // 5  # Each 5 points = 1% bond
     new_bond = min(max_bond, current_bond + bond_increase)
 
     # Deduct points and update bond
@@ -687,53 +831,64 @@ async def profile(ctx: lightbulb.Context):
     data = load_data()
     user_data = create_user(data, user_id)
 
+    # Check if the user has voted on TopGG
     has_voted = await topgg_client.get_user_vote(user_id)
-    if has_voted:
-        user_data["points"] += 50
-        if user_data["premium"]:
-            user_data["points"] += 50
-        save_data(data) 
 
+    if has_voted:
+        # Ensure vote expiration logic is checked only if the user has voted
+        if user_data.get("last_voted_at"):
+            last_voted_time = datetime.datetime.strptime(user_data["last_voted_at"], "%Y-%m-%d %H:%M:%S")
+            if datetime.datetime.now() - last_voted_time > datetime.timedelta(hours=12):  # 12 hours expired
+                user_data["point_received"] = False  # Reset flag
+                user_data["last_voted_at"] = None  # Clear timestamp
+        
+        # Only grant points if they haven’t received them yet
+        if not user_data.get("point_received", False):
+            user_data["points"] += 50
+            if user_data["premium"]:
+                user_data["points"] += 50
+            user_data["point_received"] = True  # Mark the user as having received points
+            user_data["last_voted_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Store vote time
+            save_data(data)
+
+    # Determine the dere type
     dere_type = "Default"
     if user_data["style"]:
-        dere_type = next((k for k, v in DERE_TYPES.items() if v == user_data["style"]), "Custom")
+        dere_type = next((k for k, v in DERE_TYPES.items() if any(user_data["style"] in s for s in v.values())), "Default")
 
+    # Calculate bond level
+    bond_level = get_bond_level(user_data["bond"])
+    bond_description = f"Aiko is a(n) `{BOND_LEVELS[bond_level]}` to you."
+
+    # Memory usage calculation
     memory_limit = 30
     memory_used = len(user_data["memory"]) // 2
     memory_percentage = round((memory_used / memory_limit) * 100) if not user_data["premium"] else "Unlimited"
     memory_status = f"{memory_percentage}%" if isinstance(memory_percentage, int) else "Unlimited"
 
-    bond = user_data["bond"]
-    if bond < 10:
-        bond_status = "Feeling lonely 😔"
-    elif bond < 30:
-        bond_status = "Tired 😟"
-    elif bond < 50:
-        bond_status = "Neutral 😐"
-    elif bond < 70:
-        bond_status = "Content 😊"
-    elif bond < 90:
-        bond_status = "Loved 😍"
-    else:
-        bond_status = "Ecstatic 💖"
-
+    # Create the embed
     embed = hikari.Embed(
         color=0x2B2D31,
-        description=f"Aiko is feeling `{bond_status}`"
+        description=bond_description
     )
     embed.set_author(name=f"{ctx.author.username}'s Profile", icon=ctx.author.avatar_url)
+
+    # Add fields to the embed
     embed.add_field(name="Streak", value=f"🔥 {user_data['streak']} days", inline=True)
-    embed.add_field(name="bond", value=f"💖 {user_data['bond']}%", inline=True)
+    embed.add_field(name="Bond", value=f"💖 {user_data['bond']}%", inline=True)
     embed.add_field(name="Points", value=f"🏅 {user_data['points']}", inline=True)
     embed.add_field(name="Memory", value=f'📀 {memory_status}', inline=True)
     embed.add_field(name="Dere", value=f'🧩 {dere_type}', inline=True)
     embed.add_field(name="Premium", value=f'{"✅ Active" if user_data["premium"] else "❌ Not Active"}', inline=True)
 
+    # Reset cooldown for premium users
     if user_data["premium"]:
         await ctx.command.cooldown_manager.reset_cooldown(ctx)
 
+    # Respond with the embed
     await ctx.respond(embed=embed)
 
+    # Log the command invocation
     try:
         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
