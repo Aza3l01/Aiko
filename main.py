@@ -321,7 +321,6 @@ async def check_premium_users():
 
         save_data(data)
 
-
 # Create user
 def create_user(data, user_id):
     """Create a new user entry in the data if it doesn't exist."""
@@ -603,7 +602,6 @@ async def memory_clear(ctx: lightbulb.Context):
 async def leaderboard(ctx):
     data = load_data()
     current_user_id = str(ctx.author.id)
-    user_data = create_user(data, user_id)
 
     all_users = []
     for user_id in data["users"]:
@@ -798,8 +796,8 @@ async def help(ctx):
             "  - Get **unlimited text** in DMs and **unlimited memory**.\n"
             "  - Get **unlimited streak restores** without needing to vote.\n"
             "  - Access exclusive **support server perks** like behind-the-scenes channels.\n"
-            "- Use the `/claim` command to receive your perks after becoming a supporter.\n\n"
-            "> *Note*: Memberships can be refunded within 3 days of purchase."
+            "- Use the `/claim` command to receive your perks after becoming a supporter.\n"
+            "> *Note*: Memberships can be refunded within 3 days of purchase.\n\n"
             
             "**__Troubleshooting and Suggestions__**\n"
             "Join the [support server](https://discord.gg/dgwAC8TFWP) for help, suggestions, or updates. My developer will be happy to assist you! [Click here](https://discord.com/oauth2/authorize?client_id=1285298352308621416) to invite Aiko to your server.\n\n"
@@ -844,7 +842,7 @@ async def profile(ctx: lightbulb.Context):
         dere_type = next((k for k, v in DERE_TYPES.items() if any(user_data["style"] in s for s in v.values())), "Default")
 
     bond_level = get_bond_level(user_data["bond"])
-    bond_description = f"Aiko is a(n) `{BOND_LEVELS[bond_level]}` to you."
+    bond_description = f"Aiko's bond to you: **{BOND_LEVELS[bond_level]}** ❤️\n\nGift her to increase her bond with you and get warmer responses.\nLearn more with the `/help` command.\n\n[Vote to earn additional gift points and unlock streak restores.](https://top.gg/bot/1285298352308621416/vote)"
 
     memory_limit = 30
     memory_used = len(user_data["memory"]) // 2
@@ -857,7 +855,6 @@ async def profile(ctx: lightbulb.Context):
     )
     embed.set_author(name=f"{ctx.author.username}'s Profile", icon=ctx.author.avatar_url)
 
-    # Add fields to the embed
     embed.add_field(name="Streak", value=f"🔥 {user_data['streak']} days", inline=True)
     embed.add_field(name="Bond", value=f"💖 {user_data['bond']}%", inline=True)
     embed.add_field(name="Points", value=f"🏅 {user_data['points']}", inline=True)
@@ -913,17 +910,14 @@ async def claim(ctx: lightbulb.Context) -> None:
             print(f"{e}")
     else:
         embed = hikari.Embed(
-            title="🎁 Premium 🎁",
+            title="Your email was not recognized.",
             description=(
-            "- Premium helps cover hosting, storage, and API request costs.\n"
-            "- Premium features of Aiko can be used for free by [voting](https://top.gg/bot/1285298352308621416/vote).\n"
-            "- By [supporting](https://ko-fi.com/aza3l/tiers) for just **$1.99/month**, you:\n"
-            "  - Unlock **2x boost** on all points earned.\n"
-            "  - Get **unlimited text** in DMs and **unlimited memory**.\n"
-            "  - Get **unlimited streak restores** without needing to vote.\n"
-            "  - Access exclusive **support server perks** like behind-the-scenes channels.\n"
-            "- Use the `/claim` command to receive your perks after becoming a supporter.\n\n"
-            "> *Note*: Memberships can be refunded within 3 days of purchase."
+            "**If this is an error, join the [support server](https://discord.gg/dgwAC8TFWP) to fix the issue.**\n\n"
+            "By [supporting](https://ko-fi.com/aza3l/tiers) for just **$1.99/month**, you:\n"
+            " - Unlock **2x boost** on all points earned.\n"
+            " - Get **unlimited text** in DMs and **unlimited memory**.\n"
+            " - Get **unlimited streak restores** without needing to vote.\n"
+            " - Access exclusive **support server perks** like behind-the-scenes channels.\n"
             ),
             color=0x2f3136
         )
