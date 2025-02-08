@@ -531,19 +531,26 @@ async def check_vote_expiration():
     while True:
         data = load_data()
         current_time = time.time()
-        current_date = datetime.datetime.fromtimestamp(current_time, tz=datetime.timezone.utc).date()
+        next_check_time = float('inf')  # Track when we should next wake up
 
         for user_id, user_data in data["users"].items():
             if user_data.get("last_voted_at"):
                 last_voted_time = datetime.datetime.strptime(user_data["last_voted_at"], "%Y-%m-%d %H:%M:%S")
-                if datetime.datetime.now() - last_voted_time > datetime.timedelta(hours=12):  # 12 hours expired
+                time_since_vote = datetime.datetime.now() - last_voted_time
+                
+                if time_since_vote > datetime.timedelta(hours=12):  # Vote expired
                     user_data["point_received"] = False
                     user_data["last_voted_at"] = None  # Reset vote time
+                else:
+                    # Calculate remaining time until expiration
+                    remaining_time = (datetime.timedelta(hours=12) - time_since_vote).total_seconds()
+                    next_check_time = min(next_check_time, remaining_time)
 
         save_data(data)
 
-        # Sleep for 12 hours before checking again
-        await asyncio.sleep(12 * 60 * 60) 
+        # If there are users with active votes, sleep until the nearest expiration
+        sleep_time = max(60, next_check_time)  # Ensure a minimum check every minute
+        await asyncio.sleep(sleep_time)
 
 # Commands----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -603,74 +610,67 @@ async def memory_clear(ctx: lightbulb.Context):
 async def leaderboard(ctx):
     data = load_data()
     current_user_id = str(ctx.author.id)
-    
-    # Ensure all users are properly initialized and get sorted list
+
+    # Load all users and their data
     all_users = []
     for user_id in data["users"]:
         user_data = create_user(data, user_id)
-        user_data["user_id"] = user_id  # Ensure user_id exists in data
+        user_data["user_id"] = user_id
         all_users.append(user_data)
-    
-    # Sort by points descending
-    sorted_users = sorted(all_users, key=lambda x: x["points"], reverse=True)
-    
-    # Prepare top 10 entries
-    top_10 = sorted_users[:10]
-    
-    # Find current user's rank and data
-    current_user_rank = None
-    current_user_data = None
-    for index, user in enumerate(sorted_users):
-        if user["user_id"] == current_user_id:
-            current_user_rank = index + 1
-            current_user_data = user
-            break
 
-    # Create embed
+    # Sort users by points in descending order
+    sorted_users = sorted(all_users, key=lambda x: x["points"], reverse=True)
+
+    # Get the top 5 users
+    top_5 = sorted_users[:5]
+
+    # Find current user rank directly
+    current_user_rank = next((index + 1 for index, user in enumerate(sorted_users) if user["user_id"] == current_user_id), None)
+    current_user_data = next((user for user in sorted_users if user["user_id"] == current_user_id), None)
+    current_user_username = await bot.rest.fetch_user(int(current_user_id)) if current_user_data else None
+
     embed = hikari.Embed(title="🏆 Leaderboard 🏆", color=0x2B2D31)
-    
-    # Build top 10 list
+
+    # Prepare top 5 list
     top_list = []
-    for idx, user in enumerate(top_10, 1):
+    for idx, user in enumerate(top_5, 1):
         try:
             user_obj = await bot.rest.fetch_user(int(user["user_id"]))
             username = user_obj.username
         except (hikari.errors.NotFoundError, KeyError):
             username = "Unknown User"
-        
+
         entry = (
             f"`#{idx}` {username}\n"
-            f"Points: {user['points']} • "
-            f"Streak: {user['streak']}"
+            f"Points: {user['points']} • Streak: {user['streak']}"
         )
         top_list.append(entry)
 
-    # Add top 10 to embed
     embed.add_field(
-        name="Top 10 Users",
+        name="Top 5",
         value="\n\n".join(top_list) if top_list else "No users yet!",
         inline=False
     )
 
-    # Add current user's position
+    # Display current user rank if found
     if current_user_data and current_user_rank:
         user_position = (
-            f"`#{current_user_rank}` You\n"
-            f"Points: {current_user_data['points']} • "
-            f"Streak: {current_user_data['streak']}"
+            f"`#{current_user_rank}` {current_user_username.username}\n"
+            f"Points: {current_user_data['points']} • Streak: {current_user_data['streak']}"
         )
-        
+
         embed.add_field(
-            name="\u200b",
+            name="You",
             value=user_position,
             inline=False
         )
+
     await ctx.respond(embed=embed)
 
 # Gift command
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.option("amount", "Number of points to gift. If not specified, will gift all available points to max bond.", type=int, required=False)
+@lightbulb.option("amount", "Number of points to gift. Leave blank to gift all available points to fill bond level.", type=int, required=False)
 @lightbulb.command("gift", "Gift points to increase Aiko's bond.")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def gift(ctx: lightbulb.Context) -> None:
@@ -770,7 +770,7 @@ async def restore(ctx: lightbulb.Context) -> None:
 # Help command
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
-@lightbulb.command("help", "You know what this is ;)")
+@lightbulb.command("help", "Learn how to use Aiko.")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def help(ctx):
     user_id = str(ctx.author.id)
@@ -787,25 +787,28 @@ async def help(ctx):
             "- **Reply** or **ping** Aiko in chat to talk to her.\n"
             "- Use the `/profile` command to view all your stats.\n"
             "- Use the `/memory_clear` command to reset Aiko's memory.\n"
+            "- Reset all your data with the `/reset_data` command. (**Cannot be reverted**)\n"
             "> *Note*: Discord won't let Aiko see your message if you don't ping or reply.\n\n"
             
             "**__Affection System__**\n"
-            "- Earn points by talking to Aiko daily and maintaining your streak.\n"
-            "- Each day the streak is maintained, you'll earn gift points.\n"
-            "- You can earn additional gift points by [voting](https://top.gg/bot/1285298352308621416/vote).\n"
+            "- Aiko comes with **15+ personalities** each with **6 bond levels**.\n"
+            "- Use the `/dere_set` command to configure her personality.\n"
+            "- Increase your bond with Aiko to receive warmer responses.\n"
             "- Use the `/gift` command to spend gift points and increase Aiko's bond.\n"
-            "> *Note*: If streaks are not maintained, Aiko's bond with you will slowly decline.\n\n"
-            
-            "**__Dere Types__**\n"
-            "- Aiko comes with **20+ personalities**.\n"
-            "- Use the `/dere_set` command to configure her personality.\n\n"
+            "- Earn 10 points by talking to Aiko daily and maintaining your streak.\n"
+            "- Each day the streak is maintained, you'll earn gift points.\n"
+            "- You can earn an additional 50 gift points by [voting](https://top.gg/bot/1285298352308621416/vote).\n"
+            "- Use the `/top` command to view the leaderboard.\n"
+            "- Streaks can be restored by using the `/restore` command.\n"
+            "> *Note*: If streaks are not maintained, Aiko's bond with you will decline.\n\n"
             
             "**__Premium__**\n"
             "- Premium helps cover hosting, storage, and API request costs.\n"
             "- Premium features of Aiko can be used for free by [voting](https://top.gg/bot/1285298352308621416/vote).\n"
             "- By [supporting](https://ko-fi.com/aza3l/tiers) for just **$1.99/month**, you:\n"
-            "  - Unlock **2x boost** on points earned.\n"
-            "  - Get **unlimited text** (in DMs) and **unlimited memory**.\n"
+            "  - Unlock **2x boost** on all points earned.\n"
+            "  - Get **unlimited text** in DMs and **unlimited memory**.\n"
+            "  - Get **unlimited streak restores** without needing to vote.\n"
             "  - Access exclusive **support server perks** like behind-the-scenes channels.\n"
             "- Use the `/claim` command to receive your perks after becoming a supporter.\n\n"
             
