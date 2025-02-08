@@ -17,15 +17,13 @@ def load_data():
     try:
         with open(DATA_FILE, 'r') as file:
             data = json.load(file)
-            # Ensure the "users" key exists
+            if "prem_email" not in data:
+                data["prem_email"] = []
             if "users" not in data:
                 data["users"] = {}
             return data
     except (FileNotFoundError, json.JSONDecodeError):
-        # New default structure
-        return {
-            "users": {}  # Ensure "users" key exists
-        }
+        return {"prem_email": [], "users": {}}
 
 def save_data(data):
     with open(DATA_FILE, 'w') as file:
@@ -33,14 +31,12 @@ def save_data(data):
 
 def update_data(new_data):
     data = load_data()
-    # Update only the "users" key if new_data contains user updates
     if "users" in new_data:
         data["users"].update(new_data["users"])
     save_data(data)
 
 data = load_data()
 
-prem_email = []
 user_reset_time = {}
 user_response_count = {}
 user_limit_reached = {}
@@ -56,8 +52,8 @@ BOND_LEVELS = {
 
 DERE_TYPES = {
     "Default": {
-        1: "You are a friendly anime waifu, maintaining polite but somewhat distant interactions.",
-        2: "You're an anime waifu becoming more comfortable with the user, showing occasional warmth in your responses.",
+        1: "You are a friendly anime waifu, maintaining polite but somewhat distant interactions. If a user asks how they can customize you and only you, you tell them to use the /help command to learn more.",
+        2: "You're an anime waifu becoming more comfortable with the user, showing occasional warmth in your responses. If a user asks how they can customize you and only you, you tell them to use the /help command to learn more.",
         3: "You an anime waifu now consider the user a friend, showing consistent care and interest in conversations.",
         4: "You an anime waifu feel deep affection for the user, often initiating heartfelt conversations.",
         5: "You're an anime waifu deeply attached to the user, expressing strong emotional investment in the relationship.",
@@ -264,18 +260,17 @@ async def on_message(event: hikari.MessageCreateEvent) -> None:
         message_content = event.message.content
         if message_content is None:
             return
-
-        message_content = message_content.strip() 
-
+        
+        message_content = message_content.strip()
         pattern = r'<@\d+>\s*(\S+@[\S]+\.[a-z]{2,6})'
         match = re.match(pattern, message_content)
-
+        
         if match:
             email = match.group(1)
-
             if re.match(r"[^@]+@[^@]+\.[^@]+", email):
-                if email not in prem_email:
-                    prem_email.append(email)
+                if email not in data["prem_email"]:
+                    data["prem_email"].append(email)
+                    save_data(data)
                     await bot.rest.create_message(1285303262127325301, f"Email `{email}` added to the list.")
                 else:
                     await bot.rest.create_message(1285303262127325301, f"Email `{email}` is already in the list.")
@@ -301,33 +296,31 @@ async def on_guild_leave(event):
 # Premium check task
 async def check_premium_users():
     while True:
-        now = datetime.datetime.now(datetime.timezone.utc)  # Use timezone-aware UTC time
+        now = datetime.datetime.now(datetime.timezone.utc)
         next_reset = now.replace(hour=0, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1)
         time_until_reset = (next_reset - now).total_seconds()
 
-        # Sleep until the next midnight UTC
         await asyncio.sleep(time_until_reset)
 
-        # Perform premium check
         data = load_data()
         current_time = int(time.time())
 
-        AVERAGE_MONTH_SECONDS = 2629000  # ~30.44 days
+        prem_email = data.get("prem_email", [])
 
         for user_id, user_data in list(data["users"].items()):
-            if user_data["premium"] and user_data["email"] and user_data["claim_time"]:
-                if current_time - user_data["claim_time"] >= AVERAGE_MONTH_SECONDS:
-                    if user_data["email"] in prem_email:
+            if user_data["premium"] and user_data["email"]:
+                if user_data["email"] not in prem_email:
+                    user_data["premium"] = False
+                    user_data["email"] = None
+                    user_data["claim_time"] = None
+                    await bot.rest.create_message(1285303262127325301, f"`{user_data['email']}` premium expired and removed from list.")
+                else:
+                    if current_time - user_data["claim_time"] >= 2628000:
                         user_data["claim_time"] = current_time
-                        prem_email.remove(user_data["email"])
                         await bot.rest.create_message(1285303262127325301, f"`{user_data['email']}` renewed premium.")
-                    else:
-                        user_data["premium"] = False
-                        user_data["email"] = None
-                        user_data["claim_time"] = None
-                        await bot.rest.create_message(1285303262127325301, f"`{user_data['email']}` premium expired.")
 
         save_data(data)
+
 
 # Create user
 def create_user(data, user_id):
@@ -610,28 +603,24 @@ async def memory_clear(ctx: lightbulb.Context):
 async def leaderboard(ctx):
     data = load_data()
     current_user_id = str(ctx.author.id)
+    user_data = create_user(data, user_id)
 
-    # Load all users and their data
     all_users = []
     for user_id in data["users"]:
         user_data = create_user(data, user_id)
         user_data["user_id"] = user_id
         all_users.append(user_data)
 
-    # Sort users by points in descending order
     sorted_users = sorted(all_users, key=lambda x: x["points"], reverse=True)
 
-    # Get the top 5 users
     top_5 = sorted_users[:5]
 
-    # Find current user rank directly
     current_user_rank = next((index + 1 for index, user in enumerate(sorted_users) if user["user_id"] == current_user_id), None)
     current_user_data = next((user for user in sorted_users if user["user_id"] == current_user_id), None)
     current_user_username = await bot.rest.fetch_user(int(current_user_id)) if current_user_data else None
 
     embed = hikari.Embed(title="🏆 Leaderboard 🏆", color=0x2B2D31)
 
-    # Prepare top 5 list
     top_list = []
     for idx, user in enumerate(top_5, 1):
         try:
@@ -652,7 +641,6 @@ async def leaderboard(ctx):
         inline=False
     )
 
-    # Display current user rank if found
     if current_user_data and current_user_rank:
         user_position = (
             f"`#{current_user_rank}` {current_user_username.username}\n"
@@ -811,6 +799,7 @@ async def help(ctx):
             "  - Get **unlimited streak restores** without needing to vote.\n"
             "  - Access exclusive **support server perks** like behind-the-scenes channels.\n"
             "- Use the `/claim` command to receive your perks after becoming a supporter.\n\n"
+            "> *Note*: Memberships can be refunded within 3 days of purchase."
             
             "**__Troubleshooting and Suggestions__**\n"
             "Join the [support server](https://discord.gg/dgwAC8TFWP) for help, suggestions, or updates. My developer will be happy to assist you! [Click here](https://discord.com/oauth2/authorize?client_id=1285298352308621416) to invite Aiko to your server.\n\n"
@@ -833,43 +822,35 @@ async def profile(ctx: lightbulb.Context):
     user_id = str(ctx.author.id)
     data = load_data()
     user_data = create_user(data, user_id)
-
-    # Check if the user has voted on TopGG
     has_voted = await topgg_client.get_user_vote(user_id)
 
     if has_voted:
-        # Ensure vote expiration logic is checked only if the user has voted
         if user_data.get("last_voted_at"):
             last_voted_time = datetime.datetime.strptime(user_data["last_voted_at"], "%Y-%m-%d %H:%M:%S")
-            if datetime.datetime.now() - last_voted_time > datetime.timedelta(hours=12):  # 12 hours expired
-                user_data["point_received"] = False  # Reset flag
-                user_data["last_voted_at"] = None  # Clear timestamp
+            if datetime.datetime.now() - last_voted_time > datetime.timedelta(hours=12):
+                user_data["point_received"] = False
+                user_data["last_voted_at"] = None
         
-        # Only grant points if they haven’t received them yet
         if not user_data.get("point_received", False):
             user_data["points"] += 50
             if user_data["premium"]:
                 user_data["points"] += 50
-            user_data["point_received"] = True  # Mark the user as having received points
-            user_data["last_voted_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Store vote time
+            user_data["point_received"] = True
+            user_data["last_voted_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             save_data(data)
 
-    # Determine the dere type
     dere_type = "Default"
     if user_data["style"]:
         dere_type = next((k for k, v in DERE_TYPES.items() if any(user_data["style"] in s for s in v.values())), "Default")
 
-    # Calculate bond level
     bond_level = get_bond_level(user_data["bond"])
     bond_description = f"Aiko is a(n) `{BOND_LEVELS[bond_level]}` to you."
 
-    # Memory usage calculation
     memory_limit = 30
     memory_used = len(user_data["memory"]) // 2
     memory_percentage = round((memory_used / memory_limit) * 100) if not user_data["premium"] else "Unlimited"
     memory_status = f"{memory_percentage}%" if isinstance(memory_percentage, int) else "Unlimited"
 
-    # Create the embed
     embed = hikari.Embed(
         color=0x2B2D31,
         description=bond_description
@@ -884,14 +865,11 @@ async def profile(ctx: lightbulb.Context):
     embed.add_field(name="Dere", value=f'🧩 {dere_type}', inline=True)
     embed.add_field(name="Premium", value=f'{"✅ Active" if user_data["premium"] else "❌ Not Active"}', inline=True)
 
-    # Reset cooldown for premium users
     if user_data["premium"]:
         await ctx.command.cooldown_manager.reset_cooldown(ctx)
 
-    # Respond with the embed
     await ctx.respond(embed=embed)
 
-    # Log the command invocation
     try:
         await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
@@ -907,6 +885,8 @@ async def claim(ctx: lightbulb.Context) -> None:
     data = load_data()
     user_id = str(ctx.author.id)
     user_data = create_user(data, user_id)
+
+    prem_email = data.get("prem_email", [])
 
     email = ctx.options.email
     current_time = int(time.time())
@@ -935,19 +915,15 @@ async def claim(ctx: lightbulb.Context) -> None:
         embed = hikari.Embed(
             title="🎁 Premium 🎁",
             description=(
-                "Your email was not recognized. If you think this is an error, join the [support server](https://discord.gg/dgwAC8TFWP) to fix this issue.\n\n"
-                "If you haven't yet [subscribed](https://ko-fi.com/aza3l/tiers), consider doing so for $1.99 a month. It keeps me online and you receive perks listed below. ❤️\n\n"
-                "**Premium Perks:**\n"
-                "• 2x Daily Gift Points boost.\n"
-                "• Unlimited responses from Aiko.\n"
-                "• Unlimited responses in DMs.\n"
-                "• Aiko will always remember your conversations.\n"
-                "• Remove cooldowns.\n\n"
-                "**Support Server Related Perks:**\n"
-                "• Access to behind-the-scenes Discord channels.\n"
-                "• Have a say in the development of Aiko.\n"
-                "• Supporter exclusive channels.\n\n"
-                "*Any memberships bought can be refunded within 3 days of purchase.*"
+            "- Premium helps cover hosting, storage, and API request costs.\n"
+            "- Premium features of Aiko can be used for free by [voting](https://top.gg/bot/1285298352308621416/vote).\n"
+            "- By [supporting](https://ko-fi.com/aza3l/tiers) for just **$1.99/month**, you:\n"
+            "  - Unlock **2x boost** on all points earned.\n"
+            "  - Get **unlimited text** in DMs and **unlimited memory**.\n"
+            "  - Get **unlimited streak restores** without needing to vote.\n"
+            "  - Access exclusive **support server perks** like behind-the-scenes channels.\n"
+            "- Use the `/claim` command to receive your perks after becoming a supporter.\n\n"
+            "> *Note*: Memberships can be refunded within 3 days of purchase."
             ),
             color=0x2f3136
         )
@@ -974,9 +950,7 @@ async def reset_data(ctx: lightbulb.Context) -> None:
         await ctx.respond("You don’t have any saved data to reset! 😊")
 
     try:
-        await bot.rest.create_message(
-            1285303262127325301, f"`{ctx.command.name}` invoked by `{ctx.author.id}`."
-        )
+        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
     except Exception as e:
         print(f"Error logging reset_data command: {e}")
 
