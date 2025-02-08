@@ -963,23 +963,32 @@ async def privacy(ctx: lightbulb.Context) -> None:
 
     embed = hikari.Embed(
         title="Privacy Policy for Aiko.",
-        description=(
-            "**Last Updated:** 13/11/2024 (DD/MM/YYYY)\n\n"
-            "Aiko (\"the Bot\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use the Bot. By using the Bot, you agree to the terms of this Privacy Policy.\n\n"
+                description=(
+            "**Last Updated:** 09/02/2025 (DD/MM/YYYY)\n\n"
+            "Aiko (\"the Bot\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information. By using the Bot, you agree to these terms.\n\n"
+            
             "__**Data Collection**__\n"
-            "**User Information:** We do not collect or store any personal information about users. For premium users, the Bot stores memory preferences and user-defined response styles locally.\n"
-            "**Usage Data:** We collect and store data on the usage of commands for analytical purposes. This data is anonymized and does not contain any personal information.\n\n"
-            "__**Collected Data Usage**__\n"
-            "**Usage Data:** Used to analyze and improve the Bot's functionality.\n"
-            "**User Customizations:** Premium settings personalize interactions.\n\n"
-            "__**Data Storage and Security**__\n"
-            "**Data Storage:** Stored securely and accessible only by authorized personnel.\n"
-            "**Security Measures:** Reasonable measures are implemented to protect data from unauthorized access, disclosure, or alteration.\n\n"
-            "__**Sharing of Information**__\n"
-            "We do not share any collected data with third parties. Data is solely used for internal analysis and improvements.\n\n"
-            "__**Changes to Privacy Policy**__\n"
-            "Changes will be updated here and at the support server. Continued use signifies acceptance of changes.\n\n"
-            "**If you wish to remove your data or have any questions, join the [support server](https://discord.gg/dgwAC8TFWP).**"
+            "**Stored Data:**\n"
+            "- User ID, bond level, gift points, chat memory (last 30 interactions), personality preferences, premium status.\n"
+            "- For premium users: Ko-fi email address (only if verified).\n"
+            "- Voting status and interaction timestamps.\n\n"
+            
+            "__**Data Usage**__\n"
+            "- Chat messages are processed by OpenAI's API to generate responses.\n"
+            "- Voting checks utilize Top.gg's API.\n"
+            "- Anonymous usage statistics to help improve bot functionality.\n"
+            "- Premium emails are stored locally and never shared externally.\n\n"
+            
+            "__**Data Retention**__\n"
+            "**Retention:** Data persists until you:\n"
+            "- Use `/reset_data`.\n"
+            "- Request deletion via [support server](https://discord.gg/dgwAC8TFWP).\n\n"
+            
+            "__**Age Requirements**__\n"
+            "You must be 13+ to use this bot (per Discord's TOS). We do not knowingly collect data from underage users.\n\n"
+            
+            "__**Policy Updates**__\n"
+            "Changes will be posted here and announced in the [support server](https://discord.gg/dgwAC8TFWP). Continued use constitutes acceptance.\n\n"
         ),
         color=0x2B2D31
     )
