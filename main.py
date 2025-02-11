@@ -17,13 +17,11 @@ def load_data():
     try:
         with open(DATA_FILE, 'r') as file:
             data = json.load(file)
-            if "prem_email" not in data:
-                data["prem_email"] = []
             if "users" not in data:
                 data["users"] = {}
             return data
     except (FileNotFoundError, json.JSONDecodeError):
-        return {"prem_email": [], "users": {}}
+        return {"users": {}}
 
 def save_data(data):
     with open(DATA_FILE, 'w') as file:
@@ -37,6 +35,8 @@ def update_data(new_data):
 
 data = load_data()
 
+# Nonpersistent data
+prem_email = []
 user_reset_time = {}
 user_response_count = {}
 user_limit_reached = {}
@@ -238,7 +238,6 @@ topgg_client = TopGGClient(bot, topgg_token)
 @bot.listen(hikari.StartedEvent)
 async def on_starting(event: hikari.StartedEvent):
     await topgg_client.setup()
-    asyncio.create_task(check_premium_users())
     asyncio.create_task(daily_maintenance())
     asyncio.create_task(check_vote_expiration())
     while True:
@@ -260,17 +259,14 @@ async def on_message(event: hikari.MessageCreateEvent) -> None:
         message_content = event.message.content
         if message_content is None:
             return
-        
-        message_content = message_content.strip()
+        message_content = message_content.strip() 
         pattern = r'<@\d+>\s*(\S+@[\S]+\.[a-z]{2,6})'
         match = re.match(pattern, message_content)
-        
         if match:
             email = match.group(1)
             if re.match(r"[^@]+@[^@]+\.[^@]+", email):
-                if email not in data["prem_email"]:
-                    data["prem_email"].append(email)
-                    save_data(data)
+                if email not in prem_email:
+                    prem_email.append(email)
                     await bot.rest.create_message(1285303262127325301, f"Email `{email}` added to the list.")
                 else:
                     await bot.rest.create_message(1285303262127325301, f"Email `{email}` is already in the list.")
@@ -292,34 +288,6 @@ async def on_guild_leave(event):
     guild = event.old_guild
     if guild is not None:
         await bot.rest.create_message(1285303262127325301, f"Left `{guild.name}`.")
-
-# Premium check task
-async def check_premium_users():
-    while True:
-        now = datetime.datetime.now(datetime.timezone.utc)
-        next_reset = now.replace(hour=0, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1)
-        time_until_reset = (next_reset - now).total_seconds()
-
-        await asyncio.sleep(time_until_reset)
-
-        data = load_data()
-        current_time = int(time.time())
-
-        prem_email = data.get("prem_email", [])
-
-        for user_id, user_data in list(data["users"].items()):
-            if user_data["premium"] and user_data["email"]:
-                if user_data["email"] not in prem_email:
-                    user_data["premium"] = False
-                    user_data["email"] = None
-                    user_data["claim_time"] = None
-                    await bot.rest.create_message(1285303262127325301, f"`{user_data['email']}` premium expired and removed from list.")
-                else:
-                    if current_time - user_data["claim_time"] >= 2628000:
-                        user_data["claim_time"] = current_time
-                        await bot.rest.create_message(1285303262127325301, f"`{user_data['email']}` renewed premium.")
-
-        save_data(data)
 
 # Create user
 def create_user(data, user_id):
@@ -668,16 +636,13 @@ async def gift(ctx: lightbulb.Context) -> None:
     current_bond = user_data["bond"]
     points_available = user_data["points"]
 
-    # If user specifies an amount
     if ctx.options.amount is not None:
         points_to_gift = ctx.options.amount
     else:
-        # Gift max points needed to reach 100% bond
-        bond_needed = max_bond - current_bond  # Bond percentage left to max
-        points_needed = bond_needed * 5  # Convert bond percentage to points
-        points_to_gift = min(points_needed, points_available)  # Gift max possible within available points
+        bond_needed = max_bond - current_bond
+        points_needed = bond_needed * 5
+        points_to_gift = min(points_needed, points_available)
 
-    # Ensure the user has enough points
     if points_to_gift <= 0:
         await ctx.respond("❌ You need to gift at least **5** points (1% bond).")
         return
@@ -685,11 +650,9 @@ async def gift(ctx: lightbulb.Context) -> None:
         await ctx.respond(f"❌ You only have **{points_available}** points available.")
         return
 
-    # Calculate bond increase
-    bond_increase = points_to_gift // 5  # Each 5 points = 1% bond
+    bond_increase = points_to_gift // 5
     new_bond = min(max_bond, current_bond + bond_increase)
 
-    # Deduct points and update bond
     user_data["points"] -= points_to_gift
     user_data["bond"] = new_bond
     save_data(data)
@@ -882,8 +845,6 @@ async def claim(ctx: lightbulb.Context) -> None:
     data = load_data()
     user_id = str(ctx.author.id)
     user_data = create_user(data, user_id)
-
-    prem_email = data.get("prem_email", [])
 
     email = ctx.options.email
     current_time = int(time.time())
