@@ -621,6 +621,11 @@ async def leaderboard(ctx):
 
     await ctx.respond(embed=embed)
 
+    try:
+        await bot.rest.create_message(1285303262127325301, f"`{ctx.command.name}` invoked in `{ctx.get_guild().name}` by `{ctx.author.id}`.")
+    except Exception as e:
+        print(f"{e}")
+
 # Gift command
 @bot.command()
 @lightbulb.add_cooldown(length=5, uses=1, bucket=lightbulb.UserBucket)
