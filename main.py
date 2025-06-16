@@ -16,7 +16,7 @@ DATA_FILE = 'data.json'
 def load_data():
     try:
         with open(DATA_FILE, 'r') as file:
-            data = json.load(file)
+            data = json.load(file)~
             if "users" not in data:
                 data["users"] = {}
             return data
@@ -532,7 +532,7 @@ async def dere_set(ctx: lightbulb.Context) -> None:
         save_data(data)
         await ctx.respond("My personality has been reset to default. Let’s start fresh! 😊 What would you like to talk about?")
     else:
-        user_data["style"] = selected_personality  # ✅ Store the personality as a string, not a dictionary
+        user_data["style"] = selected_personality
         save_data(data)
         await ctx.respond(f'My personality has been set to: “{selected_personality}”.')
 
@@ -805,9 +805,7 @@ async def profile(ctx: lightbulb.Context):
             user_data["last_voted_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             save_data(data)
 
-    dere_type = "Default"
-    if user_data["style"]:
-        dere_type = next((k for k, v in DERE_TYPES.items() if any(user_data["style"] in s for s in v.values())), "Default")
+    dere_type = user_data["style"] if user_data["style"] else "Default"
 
     bond_level = get_bond_level(user_data["bond"])
     bond_description = f"Aiko's bond to you: **{BOND_LEVELS[bond_level]}** ❤️\n\nGift her to increase her bond with you and get warmer responses.\nLearn more with the `/help` command.\n\n[Vote to earn additional gift points and unlock streak restores.](https://top.gg/bot/1285298352308621416/vote)"
