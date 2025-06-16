@@ -16,7 +16,7 @@ DATA_FILE = 'data.json'
 def load_data():
     try:
         with open(DATA_FILE, 'r') as file:
-            data = json.load(file)~
+            data = json.load(file)
             if "users" not in data:
                 data["users"] = {}
             return data
